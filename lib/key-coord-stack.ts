@@ -29,6 +29,9 @@ export class KeyCoordStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     })
 
+    const blizzardClientId = process.env.BLIZZARD_CLIENT_ID ?? ''
+    const blizzardClientSecret = process.env.BLIZZARD_CLIENT_SECRET ?? ''
+
     const commonEnv = { TABLE_NAME: table.tableName }
     const handlerDefaults = {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -52,6 +55,17 @@ export class KeyCoordStack extends cdk.Stack {
       ...handlerDefaults,
       functionName: `key-coord-delete-key${suffix}`,
       entry: 'src/handlers/deleteKey.ts',
+    })
+
+    const authCallbackFn = new lambdaNodejs.NodejsFunction(this, `key-coord-auth-callback${suffix}`, {
+      ...handlerDefaults,
+      functionName: `key-coord-auth-callback${suffix}`,
+      entry: 'src/handlers/authCallback.ts',
+      environment: {
+        ...commonEnv,
+        BLIZZARD_CLIENT_ID: blizzardClientId,
+        BLIZZARD_CLIENT_SECRET: blizzardClientSecret,
+      },
     })
 
     table.grantReadWriteData(putKeyFn)
@@ -83,6 +97,12 @@ export class KeyCoordStack extends cdk.Stack {
       path: '/keys/{guildId}/{characterName}',
       methods: [apigateway.HttpMethod.DELETE],
       integration: new apigatewayIntegrations.HttpLambdaIntegration(`key-coord-delete-key-integration${suffix}`, deleteKeyFn),
+    })
+
+    httpApi.addRoutes({
+      path: '/auth/callback',
+      methods: [apigateway.HttpMethod.GET],
+      integration: new apigatewayIntegrations.HttpLambdaIntegration(`key-coord-auth-callback-integration${suffix}`, authCallbackFn),
     })
 
     const websiteBucket = new s3.Bucket(this, `key-coord-website${suffix}`, {
