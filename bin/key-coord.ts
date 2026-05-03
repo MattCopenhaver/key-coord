@@ -10,5 +10,5 @@ new CiStack(app, 'key-coord-ci-iam-user')
 const envSuffix = app.node.tryGetContext('envSuffix') as string | undefined
 if (envSuffix !== undefined) {
   // eslint-disable-next-line no-new
-  new KeyCoordStack(app, `key-coord-${envSuffix}`, { envSuffix })
+  new KeyCoordStack(app, 'key-coord', { envSuffix, stackName: `key-coord-${envSuffix}` })
 }
