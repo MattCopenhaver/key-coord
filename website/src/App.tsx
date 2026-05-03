@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { getDungeonName } from './data/dungeons'
+import Select from './components/Select'
 import { getClassColor, classColorById } from './data/classes'
 import { useAuth } from './context/AuthContext'
 
@@ -37,7 +38,7 @@ function keyLevelColor (level: number): string {
 
 function SortIcon ({ field, sortField, sortDir }: { field: SortField, sortField: SortField, sortDir: SortDir }): JSX.Element {
   if (field !== sortField) {
-    return <span className="ml-1 text-slate-700">↕</span>
+    return <span className="ml-1 text-amber-700">{'↕︎'}</span>
   }
   return <span className="ml-1 text-amber-400">{sortDir === 'asc' ? '↑' : '↓'}</span>
 }
@@ -51,6 +52,10 @@ export default function App (): JSX.Element {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [dungeonMedia, setDungeonMedia] = useState<Map<number, string>>(new Map())
   const [memberColors, setMemberColors] = useState<Map<string, string>>(new Map())
+  const [filterChar, setFilterChar] = useState('')
+  const [filterDungeonId, setFilterDungeonId] = useState('')
+  const [filterMinLevel, setFilterMinLevel] = useState('')
+  const [filterMaxLevel, setFilterMaxLevel] = useState('')
 
   const fetchKeys = useCallback(async (): Promise<void> => {
     if (selectedCharacter === null) return
@@ -146,21 +151,37 @@ export default function App (): JSX.Element {
     }
   }
 
+  const dungeonOptions = useMemo(() => {
+    const ids = [...new Set(keys.map(k => k.dungeonId))]
+    return ids.sort((a, b) => getDungeonName(a).localeCompare(getDungeonName(b)))
+  }, [keys])
+
   const sortedKeys = useMemo(() => {
-    return [...keys].sort((a, b) => {
-      let cmp = 0
-      if (sortField === 'characterName') {
-        cmp = a.characterName.localeCompare(b.characterName)
-      } else if (sortField === 'dungeonId') {
-        cmp = getDungeonName(a.dungeonId).localeCompare(getDungeonName(b.dungeonId))
-      } else if (sortField === 'keyLevel') {
-        cmp = a.keyLevel - b.keyLevel
-      } else {
-        cmp = a.updatedAt.localeCompare(b.updatedAt)
-      }
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-  }, [keys, sortField, sortDir])
+    const minLevel = filterMinLevel !== '' ? parseInt(filterMinLevel, 10) : null
+    const maxLevel = filterMaxLevel !== '' ? parseInt(filterMaxLevel, 10) : null
+    const dungeonId = filterDungeonId !== '' ? parseInt(filterDungeonId, 10) : null
+    return [...keys]
+      .filter(k => {
+        if (filterChar !== '' && !k.characterName.toLowerCase().includes(filterChar.toLowerCase())) return false
+        if (dungeonId !== null && k.dungeonId !== dungeonId) return false
+        if (minLevel !== null && !isNaN(minLevel) && k.keyLevel < minLevel) return false
+        if (maxLevel !== null && !isNaN(maxLevel) && k.keyLevel > maxLevel) return false
+        return true
+      })
+      .sort((a, b) => {
+        let cmp = 0
+        if (sortField === 'characterName') {
+          cmp = a.characterName.localeCompare(b.characterName)
+        } else if (sortField === 'dungeonId') {
+          cmp = getDungeonName(a.dungeonId).localeCompare(getDungeonName(b.dungeonId))
+        } else if (sortField === 'keyLevel') {
+          cmp = a.keyLevel - b.keyLevel
+        } else {
+          cmp = a.updatedAt.localeCompare(b.updatedAt)
+        }
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+  }, [keys, sortField, sortDir, filterChar, filterDungeonId, filterMinLevel, filterMaxLevel])
 
   const thClass = 'px-4 sm:px-6 py-3 text-left text-xs sm:text-sm font-semibold uppercase tracking-wider text-slate-500 cursor-pointer select-none hover:text-slate-300 transition-colors'
 
@@ -259,7 +280,7 @@ export default function App (): JSX.Element {
               </div>
               <div className="flex items-center gap-3">
                 <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-sm font-medium text-slate-300">
-                  {keys.length} {keys.length === 1 ? 'key' : 'keys'}
+                  {sortedKeys.length}{sortedKeys.length !== keys.length && <span className="text-slate-500"> / {keys.length}</span>} {sortedKeys.length === 1 ? 'key' : 'keys'}
                 </span>
                 <button
                   onClick={() => { void fetchKeys() }}
@@ -268,6 +289,35 @@ export default function App (): JSX.Element {
                   Refresh
                 </button>
               </div>
+            </div>
+            <div className="flex flex-wrap gap-2 border-b border-slate-800 px-4 sm:px-6 py-3">
+              <input
+                type="text"
+                placeholder="Character…"
+                value={filterChar}
+                onChange={e => { setFilterChar(e.target.value) }}
+                className="w-36 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+              <Select
+                value={filterDungeonId}
+                onChange={setFilterDungeonId}
+                options={dungeonOptions.map(id => ({ value: String(id), label: getDungeonName(id) }))}
+                placeholder="All dungeons"
+              />
+              <input
+                type="number"
+                placeholder="Min level…"
+                value={filterMinLevel}
+                onChange={e => { setFilterMinLevel(e.target.value) }}
+                className="w-28 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+              <input
+                type="number"
+                placeholder="Max level…"
+                value={filterMaxLevel}
+                onChange={e => { setFilterMaxLevel(e.target.value) }}
+                className="w-28 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm sm:text-base">
@@ -288,6 +338,11 @@ export default function App (): JSX.Element {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
+                  {sortedKeys.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-10 text-center text-sm text-slate-500">No keys match your filters.</td>
+                    </tr>
+                  )}
                   {sortedKeys.map(key => (
                     <tr key={key.characterName} className="transition-colors hover:bg-slate-800/40">
                       <td className="px-4 sm:px-6 py-3 sm:py-4 font-medium" style={{ color: memberColors.get(key.characterName) ?? 'white' }}>{key.characterName}</td>
