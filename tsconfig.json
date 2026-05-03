@@ -9,5 +9,5 @@
     "outDir": "dist",
     "rootDir": "."
   },
-  "exclude": ["node_modules", "cdk.out", "dist"]
+  "exclude": ["node_modules", "cdk.out", "dist", "website"]
 }

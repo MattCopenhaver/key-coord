@@ -37,8 +37,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       dungeonId,
       keyLevel,
       updatedAt: new Date(now * 1000).toISOString(),
-      ttl: now + ONE_WEEK_SECONDS
-    }
+      ttl: now + ONE_WEEK_SECONDS,
+    },
   }))
 
   return { statusCode: 200, body: JSON.stringify({ success: true }) }

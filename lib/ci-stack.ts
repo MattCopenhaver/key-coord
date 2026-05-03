@@ -7,19 +7,19 @@ export class CiStack extends cdk.Stack {
     super(scope, id, props)
 
     const ciUser = new iam.User(this, 'key-coord-ci-iam-user-iam-user', {
-      userName: 'key-coord-ci-iam-user'
+      userName: 'key-coord-ci-iam-user',
     })
 
     ciUser.addToPolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ['sts:AssumeRole'],
-      resources: ['arn:aws:iam::*:role/cdk-*']
+      resources: ['arn:aws:iam::*:role/cdk-*'],
     }))
 
     ciUser.addToPolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ['cloudformation:DescribeStacks'],
-      resources: ['*']
+      resources: ['*'],
     }))
   }
 }

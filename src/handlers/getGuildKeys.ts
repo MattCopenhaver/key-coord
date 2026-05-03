@@ -47,8 +47,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     FilterExpression: filterParts.length > 0 ? filterParts.join(' AND ') : undefined,
     ExpressionAttributeValues: {
       ':guildId': guildId,
-      ...expressionValues
-    }
+      ...expressionValues,
+    },
   }))
 
   const keys = (result.Items ?? []).map((item) => ({
@@ -56,11 +56,11 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     characterName: item.characterName,
     dungeonId: item.dungeonId,
     keyLevel: item.keyLevel,
-    updatedAt: item.updatedAt
+    updatedAt: item.updatedAt,
   }))
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ keys })
+    body: JSON.stringify({ keys }),
   }
 }
