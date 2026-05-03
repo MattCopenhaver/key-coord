@@ -28,7 +28,7 @@ export default function Select ({ value, onChange, options, placeholder, classNa
   }
 
   const toggleOpen = (): void => {
-    if (!open && buttonRef.current) {
+    if (!open && buttonRef.current !== null) {
       const rect = buttonRef.current.getBoundingClientRect()
       setDropdownStyle({
         position: 'fixed',
