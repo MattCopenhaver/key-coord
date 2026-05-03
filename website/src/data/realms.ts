@@ -36,7 +36,7 @@ export const realmsByRegion: Record<Region, string[]> = {
     'Thunderhorn', 'Thunderlord', 'Tichondrius', 'Trollbane', 'Turalyon',
     'Twisting Nether', 'Uldaman', 'Uldum', 'Undermine', 'Uther', 'Vashj',
     'Vek\'nilash', 'Velen', 'Windrunner', 'Winterhoof', 'Wyrmrest Accord',
-    'Ysera', 'Ysondre', 'Zangarmarsh', 'Zul\'jin', 'Zuluhed'
+    'Ysera', 'Ysondre', 'Zangarmarsh', 'Zul\'jin', 'Zuluhed',
   ],
   EU: [
     'Aegwynn', 'Aerie Peak', 'Agamaggan', 'Aggramar', 'Alexstrasza', 'Alleria',
@@ -70,24 +70,24 @@ export const realmsByRegion: Record<Region, string[]> = {
     'Turalyon', 'Twilight\'s Hammer', 'Twisting Nether', 'Tyrande', 'Uldaman',
     'Uldum', 'Un\'Goro', 'Vashj', 'Vek\'lor', 'Vek\'nilash', 'Vol\'jin',
     'Wildhammer', 'Windrunner', 'Wyrmrest Accord', 'Ysera', 'Ysondre',
-    'Zenedar', 'Zirkel des Cenarius', 'Zul\'jin', 'Zuluhed'
+    'Zenedar', 'Zirkel des Cenarius', 'Zul\'jin', 'Zuluhed',
   ],
   KR: [
     'Alexstrasza', 'Azshara', 'Burning Legion', 'Cenarius', 'Dalaran',
     'Deathwing', 'Durotan', 'Gul\'dan', 'Hellscream', 'Hyjal', 'Kargath',
-    'Malfurion', 'Norgannon', 'Stormrage', 'Windrunner', 'Zuluhed'
+    'Malfurion', 'Norgannon', 'Stormrage', 'Windrunner', 'Zuluhed',
   ],
   TW: [
     'Arthas', 'Bleeding Hollow', 'Crystalpine Stinger', 'Demon Soul',
     'Dragonmaw', 'Icecrown', 'Light\'s Hope', 'Menethil', 'Nightsong',
     'Order of the Cloud Serpent', 'Silverwing Hold', 'Skywall', 'Spirestone',
-    'Stormscale', 'Sundown Marsh', 'Wrathbringer', 'Zealot Blade'
+    'Stormscale', 'Sundown Marsh', 'Wrathbringer', 'Zealot Blade',
   ],
   CN: [
     'Auchindoun', 'Azuregos', 'Bronzebeard', 'Burning Blade', 'Dalaran',
     'Deathwing', 'Destromath', 'Doomhammer', 'Dragonmaw', 'Earthen Ring',
     'Illidan', 'Kel\'Thuzad', 'Kil\'jaeden', 'Lightbringer', 'Mal\'Ganis',
     'Mannoroth', 'Proudmoore', 'Sargeras', 'Shadowmoon', 'Stormrage',
-    'Thrall', 'Tichondrius', 'Turalyon', 'Windrunner', 'Ysera', 'Zuluhed'
-  ]
+    'Thrall', 'Tichondrius', 'Turalyon', 'Windrunner', 'Ysera', 'Zuluhed',
+  ],
 }

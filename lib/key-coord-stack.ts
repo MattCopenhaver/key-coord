@@ -25,32 +25,32 @@ export class KeyCoordStack extends cdk.Stack {
       sortKey: { name: 'characterName', type: dynamodb.AttributeType.STRING },
       timeToLiveAttribute: 'ttl',
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.DESTROY
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     })
 
     const commonEnv = { TABLE_NAME: table.tableName }
     const handlerDefaults = {
       runtime: lambda.Runtime.NODEJS_20_X,
       environment: commonEnv,
-      bundling: { externalModules: ['@aws-sdk/*'] }
+      bundling: { externalModules: ['@aws-sdk/*'] },
     }
 
     const putKeyFn = new lambdaNodejs.NodejsFunction(this, `key-coord-put-key${suffix}`, {
       ...handlerDefaults,
       functionName: `key-coord-put-key${suffix}`,
-      entry: 'src/handlers/putKey.ts'
+      entry: 'src/handlers/putKey.ts',
     })
 
     const getGuildKeysFn = new lambdaNodejs.NodejsFunction(this, `key-coord-get-guild-keys${suffix}`, {
       ...handlerDefaults,
       functionName: `key-coord-get-guild-keys${suffix}`,
-      entry: 'src/handlers/getGuildKeys.ts'
+      entry: 'src/handlers/getGuildKeys.ts',
     })
 
     const deleteKeyFn = new lambdaNodejs.NodejsFunction(this, `key-coord-delete-key${suffix}`, {
       ...handlerDefaults,
       functionName: `key-coord-delete-key${suffix}`,
-      entry: 'src/handlers/deleteKey.ts'
+      entry: 'src/handlers/deleteKey.ts',
     })
 
     table.grantReadWriteData(putKeyFn)
@@ -62,33 +62,33 @@ export class KeyCoordStack extends cdk.Stack {
       corsPreflight: {
         allowOrigins: ['*'],
         allowMethods: [apigateway.CorsHttpMethod.ANY],
-        allowHeaders: ['*']
-      }
+        allowHeaders: ['*'],
+      },
     })
 
     httpApi.addRoutes({
       path: '/keys/{guildId}/{characterName}',
       methods: [apigateway.HttpMethod.PUT],
-      integration: new apigatewayIntegrations.HttpLambdaIntegration(`key-coord-put-key-integration${suffix}`, putKeyFn)
+      integration: new apigatewayIntegrations.HttpLambdaIntegration(`key-coord-put-key-integration${suffix}`, putKeyFn),
     })
 
     httpApi.addRoutes({
       path: '/keys/{guildId}',
       methods: [apigateway.HttpMethod.GET],
-      integration: new apigatewayIntegrations.HttpLambdaIntegration(`key-coord-get-guild-keys-integration${suffix}`, getGuildKeysFn)
+      integration: new apigatewayIntegrations.HttpLambdaIntegration(`key-coord-get-guild-keys-integration${suffix}`, getGuildKeysFn),
     })
 
     httpApi.addRoutes({
       path: '/keys/{guildId}/{characterName}',
       methods: [apigateway.HttpMethod.DELETE],
-      integration: new apigatewayIntegrations.HttpLambdaIntegration(`key-coord-delete-key-integration${suffix}`, deleteKeyFn)
+      integration: new apigatewayIntegrations.HttpLambdaIntegration(`key-coord-delete-key-integration${suffix}`, deleteKeyFn),
     })
 
     const websiteBucket = new s3.Bucket(this, `key-coord-website${suffix}`, {
       bucketName: `key-coord-website${suffix}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: true
+      autoDeleteObjects: true,
     })
 
     const stripApiPrefixFn = new cloudfront.Function(this, `key-coord-strip-api-prefix${suffix}`, {
@@ -101,7 +101,7 @@ function handler(event) {
   return request;
 }
       `),
-      runtime: cloudfront.FunctionRuntime.JS_2_0
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
     })
 
     const apiDomain = `${httpApi.httpApiId}.execute-api.${this.region}.amazonaws.com`
@@ -110,7 +110,7 @@ function handler(event) {
       defaultBehavior: {
         origin: cloudfrontOrigins.S3BucketOrigin.withOriginAccessControl(websiteBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
       },
       additionalBehaviors: {
         '/api/*': {
@@ -120,15 +120,15 @@ function handler(event) {
           allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
           functionAssociations: [{
             function: stripApiPrefixFn,
-            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST
-          }]
-        }
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+          }],
+        },
       },
       defaultRootObject: 'index.html',
       errorResponses: [
         { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html' },
-        { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html' }
-      ]
+        { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html' },
+      ],
     })
 
     // eslint-disable-next-line no-new
