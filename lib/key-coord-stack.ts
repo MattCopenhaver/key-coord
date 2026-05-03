@@ -5,6 +5,7 @@ import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs'
 import * as apigateway from 'aws-cdk-lib/aws-apigatewayv2'
 import * as apigatewayIntegrations from 'aws-cdk-lib/aws-apigatewayv2-integrations'
 import * as s3 from 'aws-cdk-lib/aws-s3'
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import * as cloudfrontOrigins from 'aws-cdk-lib/aws-cloudfront-origins'
 import { type Construct } from 'constructs'
@@ -132,10 +133,16 @@ function handler(event) {
     })
 
     // eslint-disable-next-line no-new
+    new s3deploy.BucketDeployment(this, `key-coord-website-deployment${suffix}`, {
+      sources: [s3deploy.Source.asset('website/dist')],
+      destinationBucket: websiteBucket,
+      distribution,
+      distributionPaths: ['/*'],
+    })
+
+    // eslint-disable-next-line no-new
     new cdk.CfnOutput(this, `key-coord-api-url${suffix}`, { value: httpApi.url ?? '' })
     // eslint-disable-next-line no-new
     new cdk.CfnOutput(this, 'WebsiteUrl', { value: `https://${distribution.distributionDomainName}` })
-    // eslint-disable-next-line no-new
-    new cdk.CfnOutput(this, 'WebsiteDistributionId', { value: distribution.distributionId })
   }
 }
