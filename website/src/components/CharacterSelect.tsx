@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { regions, type Region } from '../data/realms'
 import { useAuth, type SelectedCharacter } from '../context/AuthContext'
+import { getClassColor } from '../data/classes'
 import Combobox from './Combobox'
 
 interface BlizzardCharacter {
@@ -14,7 +15,8 @@ interface BlizzardProfile {
 }
 
 interface BlizzardCharacterProfile {
-  guild?: { name: string, realm: { slug: string } }
+  guild?: { name: string, realm: { slug: string, name: string } }
+  character_class?: { name: string }
 }
 
 interface BlizzardCharacterMedia {
@@ -28,7 +30,9 @@ interface FetchedCharacter {
   level: number
   guild: string | null
   guildRealm: string | null
+  guildRealmName: string | null
   avatar: string | null
+  className: string | null
 }
 
 async function fetchCharacters (region: Region, accessToken: string): Promise<FetchedCharacter[]> {
@@ -51,7 +55,9 @@ async function fetchCharacters (region: Region, accessToken: string): Promise<Fe
         level: char.level,
         guild: null,
         guildRealm: null,
+        guildRealmName: null,
         avatar: null,
+        className: null,
       }
       if (char.level < 70) return base2
       const charPath = `${base}/profile/wow/character/${char.realm.slug}/${char.name.toLowerCase()}`
@@ -60,13 +66,15 @@ async function fetchCharacters (region: Region, accessToken: string): Promise<Fe
           fetch(`${charPath}?namespace=${ns}&locale=en_US`, { headers }),
           fetch(`${charPath}/character-media?namespace=${ns}&locale=en_US`, { headers }),
         ])
-        const profile = profileRes.ok ? await profileRes.json() as BlizzardCharacterProfile : null
+        const charProfile = profileRes.ok ? await profileRes.json() as BlizzardCharacterProfile : null
         const media = mediaRes.ok ? await mediaRes.json() as BlizzardCharacterMedia : null
         return {
           ...base2,
-          guild: profile?.guild?.name ?? null,
-          guildRealm: profile?.guild?.realm.slug ?? null,
+          guild: charProfile?.guild?.name ?? null,
+          guildRealm: charProfile?.guild?.realm.slug ?? null,
+          guildRealmName: charProfile?.guild?.realm.name ?? null,
           avatar: media?.assets.find(a => a.key === 'avatar')?.value ?? null,
+          className: charProfile?.character_class?.name ?? null,
         }
       } catch {
         return base2
@@ -104,7 +112,9 @@ export default function CharacterSelect (): JSX.Element {
       region,
       guild: char.guild,
       guildRealm: char.guildRealm,
+      guildRealmName: char.guildRealmName ?? char.guildRealm,
       avatar: char.avatar,
+      className: char.className,
     }
     selectCharacter(selected)
   }
@@ -162,16 +172,21 @@ export default function CharacterSelect (): JSX.Element {
               <button
                 key={`${char.realm}-${char.name}`}
                 onClick={() => { onSelect(char) }}
-                className="flex w-full items-center gap-3 sm:gap-4 rounded-xl border border-slate-800 bg-slate-900 px-4 sm:px-5 py-3 sm:py-4 text-left transition hover:border-amber-500 hover:bg-slate-800"
+                className="flex w-full items-center gap-3 sm:gap-4 rounded-xl border border-slate-800 bg-slate-900 px-4 sm:px-5 py-3 sm:py-4 text-left transition hover:border-slate-700 hover:bg-slate-800"
               >
                 {char.avatar !== null
-                  ? <img src={char.avatar} alt={char.name} className="h-12 w-12 rounded-lg object-cover" />
-                  : <div className="h-12 w-12 rounded-lg bg-slate-800" />}
-                <div className="flex-1">
-                  <p className="text-base font-semibold text-white">{char.name}</p>
-                  <p className="text-sm text-slate-400">{char.realm}</p>
+                  ? <img src={char.avatar} alt={char.name} className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
+                  : <div className="h-12 w-12 rounded-lg bg-slate-800 flex-shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-base font-semibold truncate"
+                    style={{ color: char.className !== null ? getClassColor(char.className) : 'white' }}
+                  >
+                    {char.name}
+                  </p>
+                  <p className="text-sm text-slate-400">{char.className ?? ''} · {char.realm}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex-shrink-0">
                   <p className="text-sm sm:text-base font-medium text-amber-400">{char.guild}</p>
                   <p className="text-xs sm:text-sm text-slate-500">Level {char.level}</p>
                 </div>

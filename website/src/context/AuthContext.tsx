@@ -12,7 +12,9 @@ export interface SelectedCharacter {
   region: Region
   guild: string
   guildRealm: string
+  guildRealmName: string
   avatar: string | null
+  className: string | null
 }
 
 interface AuthContextValue {
@@ -58,7 +60,7 @@ export function AuthProvider ({ children }: { children: ReactNode }): JSX.Elemen
   const [user, setUser] = useState<AuthUser | null>(() => loadJson<AuthUser>(AUTH_KEY))
   const [selectedCharacter, setSelectedCharacter] = useState<SelectedCharacter | null>(() => {
     const char = loadJson<SelectedCharacter>(CHAR_KEY)
-    if (char?.guildRealm === undefined) return null
+    if (char?.guildRealm === undefined || char.guildRealmName === undefined) return null
     return char
   })
 

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { getDungeonName } from './data/dungeons'
+import { getClassColor, classColorById } from './data/classes'
 import { useAuth } from './context/AuthContext'
 
 interface Key {
@@ -15,6 +16,12 @@ interface BlizzardMythicDungeon {
 
 interface BlizzardJournalMedia {
   assets: Array<{ key: string, value: string }>
+}
+
+interface BlizzardGuildRoster {
+  members: Array<{
+    character: { name: string, playable_class: { id: number } }
+  }>
 }
 
 type SortField = 'characterName' | 'dungeonId' | 'keyLevel' | 'updatedAt'
@@ -43,6 +50,7 @@ export default function App (): JSX.Element {
   const [sortField, setSortField] = useState<SortField>('keyLevel')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [dungeonMedia, setDungeonMedia] = useState<Map<number, string>>(new Map())
+  const [memberColors, setMemberColors] = useState<Map<string, string>>(new Map())
 
   const fetchKeys = useCallback(async (): Promise<void> => {
     if (selectedCharacter === null) return
@@ -108,6 +116,27 @@ export default function App (): JSX.Element {
     })
   }, [keys, user, selectedCharacter])
 
+  useEffect(() => {
+    if (user === null || selectedCharacter === null) return
+    const region = selectedCharacter.region.toLowerCase()
+    const base = `https://${region}.api.blizzard.com`
+    const guildSlug = selectedCharacter.guild.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
+    void fetch(
+      `${base}/data/wow/guild/${selectedCharacter.guildRealm}/${guildSlug}/roster?namespace=profile-${region}&locale=en_US`,
+      { headers: { Authorization: `Bearer ${user.accessToken}` } },
+    ).then(async res => {
+      if (!res.ok) return
+      const data = await res.json() as BlizzardGuildRoster
+      const map = new Map<string, string>()
+      for (const { character } of data.members) {
+        const color = classColorById[character.playable_class.id]
+        if (color !== undefined) map.set(character.name, color)
+      }
+      setMemberColors(map)
+    }).catch(() => {})
+  }, [user, selectedCharacter])
+
   const onSort = (field: SortField): void => {
     if (field === sortField) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -153,7 +182,12 @@ export default function App (): JSX.Element {
                         <img src={selectedCharacter.avatar} alt={selectedCharacter.name} className="h-9 w-9 rounded-lg object-cover" />
                       )}
                       <div className="text-right">
-                        <p className="text-sm font-medium text-white">{selectedCharacter.name}</p>
+                        <p
+                          className="text-sm font-medium"
+                          style={{ color: selectedCharacter.className !== null ? getClassColor(selectedCharacter.className) : 'white' }}
+                        >
+                          {selectedCharacter.name}
+                        </p>
                         <button
                           onClick={clearCharacter}
                           className="text-xs text-slate-500 transition hover:text-amber-400"
@@ -221,7 +255,7 @@ export default function App (): JSX.Element {
             <div className="flex items-center justify-between border-b border-slate-800 px-4 sm:px-6 py-4">
               <div>
                 <p className="text-base font-semibold text-white">{selectedCharacter.guild}</p>
-                <p className="text-sm text-slate-500">{selectedCharacter.guildRealm} · {selectedCharacter.region}</p>
+                <p className="text-sm text-slate-500">{selectedCharacter.guildRealmName} · {selectedCharacter.region}</p>
               </div>
               <div className="flex items-center gap-3">
                 <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-sm font-medium text-slate-300">
@@ -256,7 +290,7 @@ export default function App (): JSX.Element {
                 <tbody className="divide-y divide-slate-800/60">
                   {sortedKeys.map(key => (
                     <tr key={key.characterName} className="transition-colors hover:bg-slate-800/40">
-                      <td className="px-4 sm:px-6 py-3 sm:py-4 font-medium text-white">{key.characterName}</td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 font-medium" style={{ color: memberColors.get(key.characterName) ?? 'white' }}>{key.characterName}</td>
                       <td className="px-4 sm:px-6 py-3 sm:py-4">
                         <div className="flex items-center gap-2.5">
                           {dungeonMedia.get(key.dungeonId) !== undefined && (
