@@ -23,14 +23,14 @@ function keyLevelColor (level: number): string {
 
 const inputClass = 'rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500'
 
-function SortIcon ({ field, sortField, sortDir }: { field: SortField, sortField: SortField, sortDir: SortDir }) {
+function SortIcon ({ field, sortField, sortDir }: { field: SortField, sortField: SortField, sortDir: SortDir }): JSX.Element {
   if (field !== sortField) {
     return <span className="ml-1 text-slate-700">↕</span>
   }
   return <span className="ml-1 text-amber-400">{sortDir === 'asc' ? '↑' : '↓'}</span>
 }
 
-export default function App () {
+export default function App (): JSX.Element {
   const [region, setRegion] = useState<Region | ''>('')
   const [realm, setRealm] = useState('')
   const [guild, setGuild] = useState('')
@@ -43,12 +43,12 @@ export default function App () {
 
   const canSearch = region !== '' && realm !== '' && guild !== ''
 
-  const onRegionChange = (value: string) => {
+  const onRegionChange = (value: string): void => {
     setRegion(value as Region | '')
     setRealm('')
   }
 
-  const fetchKeys = async () => {
+  const fetchKeys = async (): Promise<void> => {
     setLoading(true)
     setError(null)
     setHasSearched(true)
@@ -65,11 +65,11 @@ export default function App () {
     }
   }
 
-  const onKeyDown = (e: React.KeyboardEvent) => {
+  const onKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter' && canSearch) void fetchKeys()
   }
 
-  const onSort = (field: SortField) => {
+  const onSort = (field: SortField): void => {
     if (field === sortField) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     } else {

@@ -9,7 +9,7 @@ interface ComboboxProps {
   className?: string
 }
 
-export default function Combobox ({ value, onChange, options, placeholder, disabled = false, className = '' }: ComboboxProps) {
+export default function Combobox ({ value, onChange, options, placeholder, disabled = false, className = '' }: ComboboxProps): JSX.Element {
   const [query, setQuery] = useState(value)
   const [open, setOpen] = useState(false)
   const [highlighted, setHighlighted] = useState(0)
@@ -31,21 +31,21 @@ export default function Combobox ({ value, onChange, options, placeholder, disab
     ? options
     : options.filter(o => o.toLowerCase().includes(query.toLowerCase()))
 
-  const select = (option: string) => {
+  const select = (option: string): void => {
     onChange(option)
     setQuery(option)
     setOpen(false)
     setHighlighted(0)
   }
 
-  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     setQuery(e.target.value)
     setHighlighted(0)
     setOpen(true)
     if (e.target.value === '') onChange('')
   }
 
-  const onKeyDown = (e: React.KeyboardEvent) => {
+  const onKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setHighlighted(h => Math.min(h + 1, filtered.length - 1))
@@ -61,7 +61,7 @@ export default function Combobox ({ value, onChange, options, placeholder, disab
     }
   }
 
-  const onBlur = (e: React.FocusEvent) => {
+  const onBlur = (e: React.FocusEvent): void => {
     if (containerRef.current?.contains(e.relatedTarget as Node) === true) return
     setOpen(false)
     if (!options.includes(query)) setQuery(value)
