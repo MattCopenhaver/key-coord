@@ -290,35 +290,6 @@ export default function App (): JSX.Element {
                 </button>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 border-b border-slate-800 px-4 sm:px-6 py-3">
-              <input
-                type="text"
-                placeholder="Character…"
-                value={filterChar}
-                onChange={e => { setFilterChar(e.target.value) }}
-                className="w-36 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-              />
-              <Select
-                value={filterDungeonId}
-                onChange={setFilterDungeonId}
-                options={dungeonOptions.map(id => ({ value: String(id), label: getDungeonName(id) }))}
-                placeholder="All dungeons"
-              />
-              <input
-                type="number"
-                placeholder="Min level…"
-                value={filterMinLevel}
-                onChange={e => { setFilterMinLevel(e.target.value) }}
-                className="w-28 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-              />
-              <input
-                type="number"
-                placeholder="Max level…"
-                value={filterMaxLevel}
-                onChange={e => { setFilterMaxLevel(e.target.value) }}
-                className="w-28 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-              />
-            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm sm:text-base">
                 <thead>
@@ -335,6 +306,45 @@ export default function App (): JSX.Element {
                     <th className={`${thClass} hidden sm:table-cell`} onClick={() => { onSort('updatedAt') }}>
                       Updated<SortIcon field="updatedAt" sortField={sortField} sortDir={sortDir} />
                     </th>
+                  </tr>
+                  <tr className="border-b border-slate-800">
+                    <td className="px-4 sm:px-6 py-2">
+                      <input
+                        type="text"
+                        placeholder="Filter…"
+                        value={filterChar}
+                        onChange={e => { setFilterChar(e.target.value) }}
+                        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                    </td>
+                    <td className="px-4 sm:px-6 py-2">
+                      <Select
+                        value={filterDungeonId}
+                        onChange={setFilterDungeonId}
+                        options={dungeonOptions.map(id => ({ value: String(id), label: getDungeonName(id) }))}
+                        placeholder="All dungeons"
+                        className="w-full"
+                      />
+                    </td>
+                    <td className="px-4 sm:px-6 py-2">
+                      <div className="flex gap-1.5">
+                        <input
+                          type="number"
+                          placeholder="Min"
+                          value={filterMinLevel}
+                          onChange={e => { setFilterMinLevel(e.target.value) }}
+                          className="w-14 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Max"
+                          value={filterMaxLevel}
+                          onChange={e => { setFilterMaxLevel(e.target.value) }}
+                          className="w-14 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        />
+                      </div>
+                    </td>
+                    <td className="hidden sm:table-cell" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">

@@ -11,12 +11,12 @@ export const classColors: Record<string, string> = {
   Rogue: '#FFF468',
   Shaman: '#0070DD',
   Warlock: '#8788EE',
-  Warrior: '#C69B3A',
+  Warrior: '#C79C6E',
 }
 
 // Blizzard playable_class IDs are stable
 export const classColorById: Record<number, string> = {
-  1: '#C69B3A', // Warrior
+  1: '#C79C6E', // Warrior
   2: '#F48CBA', // Paladin
   3: '#AAD372', // Hunter
   4: '#FFF468', // Rogue
