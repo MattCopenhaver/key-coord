@@ -15,6 +15,9 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npx tsc --noEmit
+      - name: Typecheck website
+        working-directory: website
+        run: npm ci && npm run typecheck
 
   deploy:
     needs: lint
@@ -32,6 +35,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - run: npm run deploy -- key-coord --context envSuffix=dev --require-approval never
+      - name: Build website
+        working-directory: website
+        run: npm ci && npm run build
+      - name: Sync website to S3
+        run: aws s3 sync website/dist s3://key-coord-website-dev --delete
+      - name: Invalidate CloudFront cache
+        run: |
+          DISTRIBUTION_ID=$(aws cloudformation describe-stacks \
+            --stack-name key-coord-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='WebsiteDistributionId'].OutputValue" \
+            --output text)
+          aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*"
 
   test:
     needs: deploy

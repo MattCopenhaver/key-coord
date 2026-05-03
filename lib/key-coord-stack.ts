@@ -4,6 +4,9 @@ import * as lambda from 'aws-cdk-lib/aws-lambda'
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs'
 import * as apigateway from 'aws-cdk-lib/aws-apigatewayv2'
 import * as apigatewayIntegrations from 'aws-cdk-lib/aws-apigatewayv2-integrations'
+import * as s3 from 'aws-cdk-lib/aws-s3'
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
+import * as cloudfrontOrigins from 'aws-cdk-lib/aws-cloudfront-origins'
 import { type Construct } from 'constructs'
 
 interface KeyCoordStackProps extends cdk.StackProps {
@@ -81,7 +84,58 @@ export class KeyCoordStack extends cdk.Stack {
       integration: new apigatewayIntegrations.HttpLambdaIntegration(`key-coord-delete-key-integration${suffix}`, deleteKeyFn)
     })
 
+    const websiteBucket = new s3.Bucket(this, `key-coord-website${suffix}`, {
+      bucketName: `key-coord-website${suffix}`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true
+    })
+
+    const stripApiPrefixFn = new cloudfront.Function(this, `key-coord-strip-api-prefix${suffix}`, {
+      functionName: `key-coord-strip-api-prefix${suffix}`,
+      code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var request = event.request;
+  request.uri = request.uri.replace(/^\\/api/, '');
+  if (request.uri === '') request.uri = '/';
+  return request;
+}
+      `),
+      runtime: cloudfront.FunctionRuntime.JS_2_0
+    })
+
+    const apiDomain = `${httpApi.httpApiId}.execute-api.${this.region}.amazonaws.com`
+
+    const distribution = new cloudfront.Distribution(this, `key-coord-distribution${suffix}`, {
+      defaultBehavior: {
+        origin: cloudfrontOrigins.S3BucketOrigin.withOriginAccessControl(websiteBucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED
+      },
+      additionalBehaviors: {
+        '/api/*': {
+          origin: new cloudfrontOrigins.HttpOrigin(apiDomain),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+          functionAssociations: [{
+            function: stripApiPrefixFn,
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST
+          }]
+        }
+      },
+      defaultRootObject: 'index.html',
+      errorResponses: [
+        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html' },
+        { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html' }
+      ]
+    })
+
     // eslint-disable-next-line no-new
     new cdk.CfnOutput(this, `key-coord-api-url${suffix}`, { value: httpApi.url ?? '' })
+    // eslint-disable-next-line no-new
+    new cdk.CfnOutput(this, 'WebsiteUrl', { value: `https://${distribution.distributionDomainName}` })
+    // eslint-disable-next-line no-new
+    new cdk.CfnOutput(this, 'WebsiteDistributionId', { value: distribution.distributionId })
   }
 }
