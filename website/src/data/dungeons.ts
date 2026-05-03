@@ -1,22 +1,13 @@
 export const dungeonNames: Record<number, string> = {
-  // The War Within Season 2
-  500: 'Priory of the Sacred Flame',
-  501: 'The Rookery',
-  502: 'Operation: Floodgate',
-  503: 'Darkflame Cleft',
-  504: 'The Stonevault',
-  505: 'City of Threads',
-  506: 'Ara-Kara, City of Echoes',
-  507: 'Cinderbrew Meadery',
-  // The War Within Season 1
-  353: 'Ara-Kara, City of Echoes',
-  369: 'City of Threads',
-  375: 'The Stonevault',
-  376: 'The Dawnbreaker',
-  377: 'Mists of Tirna Scithe',
-  378: 'The Necrotic Wake',
-  379: 'Siege of Boralus',
-  400: 'Grim Batol',
+  // The War Within Season 3
+  558: "Magisters' Terrace",
+  560: 'Maisara Caverns',
+  559: 'Nexus-Point Xenas',
+  557: 'Windrunner Spire',
+  402: "Algeth'ar Academy",
+  583: 'Seat of the Triumvirate',
+  161: 'Skyreach',
+  556: 'Pit of Saron',
 }
 
 export function getDungeonName (id: number): string {

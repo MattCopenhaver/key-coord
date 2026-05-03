@@ -36,8 +36,14 @@ jobs:
           aws-region: us-east-1
       - name: Build website
         working-directory: website
+        env:
+          VITE_BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
         run: npm ci && npm run build
-      - run: npm run deploy -- key-coord --context envSuffix=dev --require-approval never
+      - name: Deploy
+        env:
+          BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
+          BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
+        run: npm run deploy -- key-coord --context envSuffix=dev --require-approval never
 
   test:
     needs: deploy

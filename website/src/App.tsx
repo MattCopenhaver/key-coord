@@ -1,13 +1,28 @@
-import { useState, useMemo } from 'react'
-import { regions, realmsByRegion, type Region } from './data/realms'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { getDungeonName } from './data/dungeons'
-import Combobox from './components/Combobox'
+import Select from './components/Select'
+import { getClassColor, classColorById } from './data/classes'
+import { useAuth } from './context/AuthContext'
 
 interface Key {
   characterName: string
   dungeonId: number
   keyLevel: number
   updatedAt: string
+}
+
+interface BlizzardMythicDungeon {
+  dungeon?: { id: number }
+}
+
+interface BlizzardJournalMedia {
+  assets: Array<{ key: string, value: string }>
+}
+
+interface BlizzardGuildRoster {
+  members: Array<{
+    character: { name: string, playable_class: { id: number } }
+  }>
 }
 
 type SortField = 'characterName' | 'dungeonId' | 'keyLevel' | 'updatedAt'
@@ -21,39 +36,34 @@ function keyLevelColor (level: number): string {
   return 'text-slate-300'
 }
 
-const inputClass = 'rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500'
-
 function SortIcon ({ field, sortField, sortDir }: { field: SortField, sortField: SortField, sortDir: SortDir }): JSX.Element {
   if (field !== sortField) {
-    return <span className="ml-1 text-slate-700">↕</span>
+    return <span className="ml-1 text-amber-700">{'↕︎'}</span>
   }
   return <span className="ml-1 text-amber-400">{sortDir === 'asc' ? '↑' : '↓'}</span>
 }
 
 export default function App (): JSX.Element {
-  const [region, setRegion] = useState<Region | ''>('')
-  const [realm, setRealm] = useState('')
-  const [guild, setGuild] = useState('')
+  const { user, login, logout, selectedCharacter, clearCharacter } = useAuth()
   const [keys, setKeys] = useState<Key[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [hasSearched, setHasSearched] = useState(false)
   const [sortField, setSortField] = useState<SortField>('keyLevel')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [dungeonMedia, setDungeonMedia] = useState<Map<number, string>>(new Map())
+  const [memberColors, setMemberColors] = useState<Map<string, string>>(new Map())
+  const [filterChar, setFilterChar] = useState('')
+  const [filterDungeonId, setFilterDungeonId] = useState('')
+  const [filterMinLevel, setFilterMinLevel] = useState('')
+  const [filterMaxLevel, setFilterMaxLevel] = useState('')
 
-  const canSearch = region !== '' && realm !== '' && guild !== ''
-
-  const onRegionChange = (value: string): void => {
-    setRegion(value as Region | '')
-    setRealm('')
-  }
-
-  const fetchKeys = async (): Promise<void> => {
+  const fetchKeys = useCallback(async (): Promise<void> => {
+    if (selectedCharacter === null) return
     setLoading(true)
     setError(null)
-    setHasSearched(true)
     try {
-      const guildId = `${region}-${realm}-${guild}`
+      const { region, guildRealm, guild } = selectedCharacter
+      const guildId = `${region}-${guildRealm}-${guild}`
       const res = await fetch(`/api/keys/${encodeURIComponent(guildId)}`)
       if (!res.ok) throw new Error(`Request failed: ${res.status}`)
       const data = await res.json() as { keys: Key[] }
@@ -63,11 +73,74 @@ export default function App (): JSX.Element {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedCharacter])
 
-  const onKeyDown = (e: React.KeyboardEvent): void => {
-    if (e.key === 'Enter' && canSearch) void fetchKeys()
-  }
+  useEffect(() => {
+    void fetchKeys()
+  }, [fetchKeys])
+
+  useEffect(() => {
+    if (keys.length === 0 || user === null || selectedCharacter === null) return
+    const region = selectedCharacter.region.toLowerCase()
+    const base = `https://${region}.api.blizzard.com`
+    const headers = { Authorization: `Bearer ${user.accessToken}` }
+    const uniqueIds = [...new Set(keys.map(k => k.dungeonId))]
+
+    void Promise.all(
+      uniqueIds.map(async (id): Promise<[number, string] | null> => {
+        try {
+          const dungeonRes = await fetch(
+            `${base}/data/wow/mythic-keystone/dungeon/${id}?namespace=dynamic-${region}`,
+            { headers },
+          )
+          if (!dungeonRes.ok) return null
+          const dungeonData = await dungeonRes.json() as BlizzardMythicDungeon
+          const journalId = dungeonData.dungeon?.id
+          if (journalId === undefined) return null
+
+          const mediaRes = await fetch(
+            `${base}/data/wow/media/journal-instance/${journalId}?namespace=static-${region}`,
+            { headers },
+          )
+          if (!mediaRes.ok) return null
+          const mediaData = await mediaRes.json() as BlizzardJournalMedia
+          const url = mediaData.assets.find(a => a.key === 'tile')?.value
+          return url !== undefined ? [id, url] : null
+        } catch {
+          return null
+        }
+      }),
+    ).then(results => {
+      setDungeonMedia(prev => {
+        const next = new Map(prev)
+        for (const r of results) {
+          if (r !== null) next.set(r[0], r[1])
+        }
+        return next
+      })
+    })
+  }, [keys, user, selectedCharacter])
+
+  useEffect(() => {
+    if (user === null || selectedCharacter === null) return
+    const region = selectedCharacter.region.toLowerCase()
+    const base = `https://${region}.api.blizzard.com`
+    const guildSlug = selectedCharacter.guild.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
+    void fetch(
+      `${base}/data/wow/guild/${selectedCharacter.guildRealm}/${guildSlug}/roster?namespace=profile-${region}&locale=en_US`,
+      { headers: { Authorization: `Bearer ${user.accessToken}` } },
+    ).then(async res => {
+      if (!res.ok) return
+      const data = await res.json() as BlizzardGuildRoster
+      const map = new Map<string, string>()
+      for (const { character } of data.members) {
+        const color = classColorById[character.playable_class.id]
+        if (color !== undefined) map.set(character.name, color)
+      }
+      setMemberColors(map)
+    }).catch(() => {})
+  }, [user, selectedCharacter])
 
   const onSort = (field: SortField): void => {
     if (field === sortField) {
@@ -78,71 +151,106 @@ export default function App (): JSX.Element {
     }
   }
 
+  const dungeonOptions = useMemo(() => {
+    const ids = [...new Set(keys.map(k => k.dungeonId))]
+    return ids.sort((a, b) => getDungeonName(a).localeCompare(getDungeonName(b)))
+  }, [keys])
+
   const sortedKeys = useMemo(() => {
-    return [...keys].sort((a, b) => {
-      let cmp = 0
-      if (sortField === 'characterName') {
-        cmp = a.characterName.localeCompare(b.characterName)
-      } else if (sortField === 'dungeonId') {
-        cmp = getDungeonName(a.dungeonId).localeCompare(getDungeonName(b.dungeonId))
-      } else if (sortField === 'keyLevel') {
-        cmp = a.keyLevel - b.keyLevel
-      } else {
-        cmp = a.updatedAt.localeCompare(b.updatedAt)
-      }
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-  }, [keys, sortField, sortDir])
+    const minLevel = filterMinLevel !== '' ? parseInt(filterMinLevel, 10) : null
+    const maxLevel = filterMaxLevel !== '' ? parseInt(filterMaxLevel, 10) : null
+    const dungeonId = filterDungeonId !== '' ? parseInt(filterDungeonId, 10) : null
+    return [...keys]
+      .filter(k => {
+        if (filterChar !== '' && !k.characterName.toLowerCase().includes(filterChar.toLowerCase())) return false
+        if (dungeonId !== null && k.dungeonId !== dungeonId) return false
+        if (minLevel !== null && !isNaN(minLevel) && k.keyLevel < minLevel) return false
+        if (maxLevel !== null && !isNaN(maxLevel) && k.keyLevel > maxLevel) return false
+        return true
+      })
+      .sort((a, b) => {
+        let cmp = 0
+        if (sortField === 'characterName') {
+          cmp = a.characterName.localeCompare(b.characterName)
+        } else if (sortField === 'dungeonId') {
+          cmp = getDungeonName(a.dungeonId).localeCompare(getDungeonName(b.dungeonId))
+        } else if (sortField === 'keyLevel') {
+          cmp = a.keyLevel - b.keyLevel
+        } else {
+          cmp = a.updatedAt.localeCompare(b.updatedAt)
+        }
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+  }, [keys, sortField, sortDir, filterChar, filterDungeonId, filterMinLevel, filterMaxLevel])
 
-  const realms = region !== '' ? realmsByRegion[region] : []
-
-  const thClass = 'px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 cursor-pointer select-none hover:text-slate-300 transition-colors'
+  const thClass = 'px-4 sm:px-6 py-3 text-left text-xs sm:text-sm font-semibold uppercase tracking-wider text-slate-500 cursor-pointer select-none hover:text-slate-300 transition-colors'
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur-sm">
-        <div className="mx-auto max-w-4xl px-6 py-5">
-          <h1 className="text-2xl font-bold tracking-tight text-amber-400">Key Coord</h1>
-          <p className="mt-0.5 text-sm text-slate-400">Track Mythic+ keys across your guild</p>
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 py-4 sm:py-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-amber-400">Key Coord</h1>
+              <p className="mt-0.5 text-sm text-slate-400">Track Mythic+ keys across your guild</p>
+            </div>
+            {user !== null
+              ? (
+                <div className="flex items-center gap-3 sm:gap-4">
+                  {selectedCharacter !== null && (
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      {selectedCharacter.avatar !== null && (
+                        <img src={selectedCharacter.avatar} alt={selectedCharacter.name} className="h-9 w-9 rounded-lg object-cover" />
+                      )}
+                      <div className="text-right">
+                        <p
+                          className="text-sm font-medium"
+                          style={{ color: selectedCharacter.className !== null ? getClassColor(selectedCharacter.className) : 'white' }}
+                        >
+                          {selectedCharacter.name}
+                        </p>
+                        <button
+                          onClick={clearCharacter}
+                          className="text-xs text-slate-500 transition hover:text-amber-400"
+                        >
+                          Change character
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    onClick={logout}
+                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-400 transition hover:border-slate-500 hover:text-white"
+                  >
+                    Log out
+                  </button>
+                </div>
+                )
+              : (
+                <button
+                  onClick={login}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
+                >
+                  Login with Battle.net
+                </button>
+                )}
+          </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-4xl px-6 py-8 space-y-5">
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">Find Your Guild</p>
-          <div className="flex gap-2">
-            <Combobox
-              value={region}
-              onChange={onRegionChange}
-              options={regions as unknown as string[]}
-              placeholder="Region"
-              className="w-24"
-            />
-            <Combobox
-              value={realm}
-              onChange={setRealm}
-              options={realms}
-              placeholder="Realm"
-              disabled={region === ''}
-              className="flex-1"
-            />
-            <input
-              type="text"
-              value={guild}
-              placeholder="Guild"
-              onChange={e => { setGuild(e.target.value) }}
-              onKeyDown={onKeyDown}
-              className={`${inputClass} flex-1`}
-            />
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-8 space-y-5">
+        {user === null && (
+          <div className="rounded-xl border border-slate-800 bg-slate-900 py-20 text-center">
+            <p className="mb-1 text-xl font-semibold text-white">Sign in to get started</p>
+            <p className="mb-6 text-base text-slate-400">Log in with Battle.net to see your guild&apos;s Mythic+ keys.</p>
             <button
-              onClick={() => { void fetchKeys() }}
-              disabled={loading || !canSearch}
-              className="rounded-lg bg-amber-500 px-5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={login}
+              className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500"
             >
-              {loading ? 'Searching…' : 'Search'}
+              Login with Battle.net
             </button>
           </div>
-        </div>
+        )}
 
         {error !== null && (
           <div className="rounded-lg border border-red-800 bg-red-950/50 px-4 py-3 text-sm text-red-400">
@@ -150,48 +258,123 @@ export default function App (): JSX.Element {
           </div>
         )}
 
-        {hasSearched && !loading && keys.length === 0 && error === null && (
-          <div className="rounded-xl border border-slate-800 bg-slate-900 py-16 text-center">
-            <p className="text-slate-500">No keys found for this guild.</p>
+        {loading && (
+          <div className="flex items-center justify-center py-20 gap-3 text-sm text-slate-500">
+            <div className="h-4 w-4 animate-spin rounded-full border border-slate-600 border-t-amber-400" />
+            Loading keys…
           </div>
         )}
 
-        {keys.length > 0 && (
+        {!loading && selectedCharacter !== null && keys.length === 0 && error === null && (
+          <div className="rounded-xl border border-slate-800 bg-slate-900 py-16 text-center">
+            <p className="text-slate-500">No keys found for <span className="text-slate-300">{selectedCharacter.guild}</span>.</p>
+          </div>
+        )}
+
+        {keys.length > 0 && selectedCharacter !== null && (
           <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Guild Keys</p>
-              <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-medium text-slate-300">
-                {keys.length} {keys.length === 1 ? 'key' : 'keys'}
-              </span>
+            <div className="flex items-center justify-between border-b border-slate-800 px-4 sm:px-6 py-4">
+              <div>
+                <p className="text-base font-semibold text-white">{selectedCharacter.guild}</p>
+                <p className="text-sm text-slate-500">{selectedCharacter.guildRealmName} · {selectedCharacter.region}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-sm font-medium text-slate-300">
+                  {sortedKeys.length}{sortedKeys.length !== keys.length && <span className="text-slate-500"> / {keys.length}</span>} {sortedKeys.length === 1 ? 'key' : 'keys'}
+                </span>
+                <button
+                  onClick={() => { void fetchKeys() }}
+                  className="text-sm text-slate-500 transition hover:text-amber-400"
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-800">
-                  <th className={thClass} onClick={() => { onSort('characterName') }}>
-                    Character<SortIcon field="characterName" sortField={sortField} sortDir={sortDir} />
-                  </th>
-                  <th className={thClass} onClick={() => { onSort('dungeonId') }}>
-                    Dungeon<SortIcon field="dungeonId" sortField={sortField} sortDir={sortDir} />
-                  </th>
-                  <th className={thClass} onClick={() => { onSort('keyLevel') }}>
-                    Level<SortIcon field="keyLevel" sortField={sortField} sortDir={sortDir} />
-                  </th>
-                  <th className={thClass} onClick={() => { onSort('updatedAt') }}>
-                    Updated<SortIcon field="updatedAt" sortField={sortField} sortDir={sortDir} />
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {sortedKeys.map(key => (
-                  <tr key={key.characterName} className="transition-colors hover:bg-slate-800/40">
-                    <td className="px-6 py-4 font-medium text-white">{key.characterName}</td>
-                    <td className="px-6 py-4 text-slate-400">{getDungeonName(key.dungeonId)}</td>
-                    <td className={`px-6 py-4 ${keyLevelColor(key.keyLevel)}`}>+{key.keyLevel}</td>
-                    <td className="px-6 py-4 text-slate-500">{new Date(key.updatedAt).toLocaleString()}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm sm:text-base">
+                <thead>
+                  <tr className="border-b border-slate-800">
+                    <th className={thClass} onClick={() => { onSort('characterName') }}>
+                      Character<SortIcon field="characterName" sortField={sortField} sortDir={sortDir} />
+                    </th>
+                    <th className={thClass} onClick={() => { onSort('dungeonId') }}>
+                      Dungeon<SortIcon field="dungeonId" sortField={sortField} sortDir={sortDir} />
+                    </th>
+                    <th className={thClass} onClick={() => { onSort('keyLevel') }}>
+                      Level<SortIcon field="keyLevel" sortField={sortField} sortDir={sortDir} />
+                    </th>
+                    <th className={`${thClass} hidden sm:table-cell`} onClick={() => { onSort('updatedAt') }}>
+                      Updated<SortIcon field="updatedAt" sortField={sortField} sortDir={sortDir} />
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                  <tr className="border-b border-slate-800">
+                    <td className="px-4 sm:px-6 py-2">
+                      <input
+                        type="text"
+                        placeholder="Filter…"
+                        value={filterChar}
+                        onChange={e => { setFilterChar(e.target.value) }}
+                        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                    </td>
+                    <td className="px-4 sm:px-6 py-2">
+                      <Select
+                        value={filterDungeonId}
+                        onChange={setFilterDungeonId}
+                        options={dungeonOptions.map(id => ({ value: String(id), label: getDungeonName(id) }))}
+                        placeholder="All dungeons"
+                        className="w-full"
+                      />
+                    </td>
+                    <td className="px-4 sm:px-6 py-2">
+                      <div className="flex gap-1.5">
+                        <input
+                          type="number"
+                          placeholder="Min"
+                          value={filterMinLevel}
+                          onChange={e => { setFilterMinLevel(e.target.value) }}
+                          className="w-14 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Max"
+                          value={filterMaxLevel}
+                          onChange={e => { setFilterMaxLevel(e.target.value) }}
+                          className="w-14 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        />
+                      </div>
+                    </td>
+                    <td className="hidden sm:table-cell" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {sortedKeys.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-10 text-center text-sm text-slate-500">No keys match your filters.</td>
+                    </tr>
+                  )}
+                  {sortedKeys.map(key => (
+                    <tr key={key.characterName} className="transition-colors hover:bg-slate-800/40">
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 font-medium" style={{ color: memberColors.get(key.characterName) ?? 'white' }}>{key.characterName}</td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4">
+                        <div className="flex items-center gap-2.5">
+                          {dungeonMedia.get(key.dungeonId) !== undefined && (
+                            <img
+                              src={dungeonMedia.get(key.dungeonId)}
+                              alt=""
+                              className="h-8 w-8 rounded object-cover flex-shrink-0"
+                            />
+                          )}
+                          <span className="text-slate-400">{getDungeonName(key.dungeonId)}</span>
+                        </div>
+                      </td>
+                      <td className={`px-4 sm:px-6 py-3 sm:py-4 ${keyLevelColor(key.keyLevel)}`}>+{key.keyLevel}</td>
+                      <td className="hidden sm:table-cell px-4 sm:px-6 py-3 sm:py-4 text-slate-500">{new Date(key.updatedAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
