@@ -50,6 +50,7 @@ export default function App (): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
+  const [submitLoading, setSubmitLoading] = useState(false)
   const hasSubmittedRef = useRef(false)
   const [sortField, setSortField] = useState<SortField>('keyLevel')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -148,6 +149,7 @@ export default function App (): JSX.Element {
   const handleSubmitKey = useCallback(async (): Promise<void> => {
     if (pendingKey === null || user === null) return
     setSubmitError(null)
+    setSubmitLoading(true)
     try {
       const region = pendingKey.region.toLowerCase()
       const profileRes = await fetch(
@@ -193,6 +195,8 @@ export default function App (): JSX.Element {
       setTimeout(() => { setSubmitSuccess(null) }, 7000)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Submission failed')
+    } finally {
+      setSubmitLoading(false)
     }
   }, [pendingKey, user, fetchKeys, clearPendingKey])
 
@@ -309,6 +313,13 @@ export default function App (): JSX.Element {
             >
               Login with Battle.net
             </button>
+          </div>
+        )}
+
+        {submitLoading && (
+          <div className="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-400">
+            <div className="h-4 w-4 animate-spin rounded-full border border-slate-600 border-t-amber-400 flex-shrink-0" />
+            Submitting your key…
           </div>
         )}
 
