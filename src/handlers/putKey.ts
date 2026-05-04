@@ -21,8 +21,12 @@ async function verifyCharacterOwnership (
 ): Promise<boolean> {
   const res = await fetch(
     `https://${region}.api.blizzard.com/profile/user/wow?namespace=profile-${region}&locale=en_US`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(10000),
+    },
   )
+  console.log('blizzard profile response', { status: res.status, ok: res.ok })
   if (!res.ok) return false
   const profile = await res.json() as BlizzardProfile
   const chars = profile.wow_accounts.flatMap(a => a.characters)
