@@ -35,6 +35,7 @@ export class KeyCoordStack extends cdk.Stack {
     const commonEnv = { TABLE_NAME: table.tableName }
     const handlerDefaults = {
       runtime: lambda.Runtime.NODEJS_20_X,
+      timeout: cdk.Duration.seconds(15),
       environment: commonEnv,
       bundling: { externalModules: ['@aws-sdk/*'] },
     }
