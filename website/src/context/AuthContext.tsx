@@ -90,7 +90,7 @@ export function AuthProvider ({ children }: { children: ReactNode }): JSX.Elemen
     const realm = params.get('realm') ?? ''
     const guildRealm = params.get('guildRealm') ?? ''
     const guild = params.get('guild') ?? ''
-    if (!region || !realm || !guild || isNaN(dungeonId) || isNaN(keyLevel)) return
+    if (region === '' || realm === '' || guild === '' || isNaN(dungeonId) || isNaN(keyLevel)) return
     const pending: PendingKey = { characterName, region, realm, guildRealm, guild, dungeonId, keyLevel }
     sessionStorage.setItem(PENDING_KEY_KEY, JSON.stringify(pending))
     setPendingKey(pending)
