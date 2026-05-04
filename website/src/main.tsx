@@ -9,9 +9,9 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 const isCallback = window.location.pathname === '/callback'
 
 function Router (): JSX.Element {
-  const { user, selectedCharacter } = useAuth()
+  const { user, selectedCharacter, pendingKey } = useAuth()
   if (isCallback) return <Callback />
-  if (user !== null && selectedCharacter === null) return <CharacterSelect />
+  if (user !== null && selectedCharacter === null && pendingKey === null) return <CharacterSelect />
   return <App />
 }
 

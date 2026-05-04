@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { type Region } from '../data/realms'
 
 export interface AuthUser {
@@ -9,6 +9,7 @@ export interface AuthUser {
 export interface SelectedCharacter {
   name: string
   realm: string
+  realmSlug: string
   region: Region
   guild: string
   guildRealm: string
@@ -17,14 +18,26 @@ export interface SelectedCharacter {
   className: string | null
 }
 
+export interface PendingKey {
+  characterName: string
+  region: string
+  realm: string
+  guildRealm: string
+  guild: string
+  dungeonId: number
+  keyLevel: number
+}
+
 interface AuthContextValue {
   user: AuthUser | null
   selectedCharacter: SelectedCharacter | null
+  pendingKey: PendingKey | null
   login: () => void
   logout: () => void
   completeLogin: (user: AuthUser) => void
   selectCharacter: (char: SelectedCharacter) => void
   clearCharacter: () => void
+  clearPendingKey: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -32,6 +45,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 const CLIENT_ID = import.meta.env.VITE_BLIZZARD_CLIENT_ID as string | undefined
 const AUTH_KEY = 'key-coord-auth'
 const CHAR_KEY = 'key-coord-character'
+const PENDING_KEY_KEY = 'key-coord-pending-key'
 
 function buildAuthUrl (): string {
   const redirectUri = `${window.location.origin}/callback`
@@ -47,9 +61,9 @@ function buildAuthUrl (): string {
   return `https://oauth.battle.net/authorize?${params.toString()}`
 }
 
-function loadJson<T> (key: string): T | null {
+function loadJson<T> (key: string, storage: Storage = localStorage): T | null {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = storage.getItem(key)
     return raw !== null ? JSON.parse(raw) as T : null
   } catch {
     return null
@@ -63,6 +77,24 @@ export function AuthProvider ({ children }: { children: ReactNode }): JSX.Elemen
     if (char?.guildRealm === undefined || char.guildRealmName === undefined) return null
     return char
   })
+  const [pendingKey, setPendingKey] = useState<PendingKey | null>(() => loadJson<PendingKey>(PENDING_KEY_KEY, sessionStorage))
+
+  useEffect(() => {
+    if (window.location.pathname === '/callback') return
+    const params = new URLSearchParams(window.location.search)
+    const characterName = params.get('characterName')
+    if (characterName === null) return
+    const dungeonId = Number(params.get('dungeonId'))
+    const keyLevel = Number(params.get('keyLevel'))
+    const region = params.get('region') ?? ''
+    const realm = params.get('realm') ?? ''
+    const guildRealm = params.get('guildRealm') ?? ''
+    const guild = params.get('guild') ?? ''
+    if (!region || !realm || !guild || isNaN(dungeonId) || isNaN(keyLevel)) return
+    const pending: PendingKey = { characterName, region, realm, guildRealm, guild, dungeonId, keyLevel }
+    sessionStorage.setItem(PENDING_KEY_KEY, JSON.stringify(pending))
+    setPendingKey(pending)
+  }, [])
 
   const login = (): void => {
     window.location.href = buildAuthUrl()
@@ -71,8 +103,10 @@ export function AuthProvider ({ children }: { children: ReactNode }): JSX.Elemen
   const logout = (): void => {
     localStorage.removeItem(AUTH_KEY)
     localStorage.removeItem(CHAR_KEY)
+    sessionStorage.removeItem(PENDING_KEY_KEY)
     setUser(null)
     setSelectedCharacter(null)
+    setPendingKey(null)
   }
 
   const completeLogin = useCallback((authUser: AuthUser): void => {
@@ -90,8 +124,13 @@ export function AuthProvider ({ children }: { children: ReactNode }): JSX.Elemen
     setSelectedCharacter(null)
   }, [])
 
+  const clearPendingKey = useCallback((): void => {
+    sessionStorage.removeItem(PENDING_KEY_KEY)
+    setPendingKey(null)
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, selectedCharacter, login, logout, completeLogin, selectCharacter, clearCharacter }}>
+    <AuthContext.Provider value={{ user, selectedCharacter, pendingKey, login, logout, completeLogin, selectCharacter, clearCharacter, clearPendingKey }}>
       {children}
     </AuthContext.Provider>
   )

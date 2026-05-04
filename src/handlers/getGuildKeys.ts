@@ -14,6 +14,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing guildId' }) }
   }
 
+  const normalizedGuildId = guildId.toLowerCase()
+
   const params = event.queryStringParameters ?? {}
   const minLevel = params.minLevel !== undefined ? Number(params.minLevel) : undefined
   const maxLevel = params.maxLevel !== undefined ? Number(params.maxLevel) : undefined
@@ -46,7 +48,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     KeyConditionExpression: 'guildId = :guildId',
     FilterExpression: filterParts.length > 0 ? filterParts.join(' AND ') : undefined,
     ExpressionAttributeValues: {
-      ':guildId': guildId,
+      ':guildId': normalizedGuildId,
       ...expressionValues,
     },
   }))

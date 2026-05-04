@@ -16,7 +16,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
 
   await docClient.send(new DeleteCommand({
     TableName: TABLE_NAME,
-    Key: { guildId, characterName },
+    Key: { guildId: guildId.toLowerCase(), characterName },
   }))
 
   return { statusCode: 200, body: JSON.stringify({ success: true }) }

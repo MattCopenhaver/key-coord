@@ -1,0 +1,7 @@
+## Interface: 110107
+## Title: KeyCoord
+## Notes: Coordinate Mythic+ keys with your guild
+## Version: 1.0.0
+## Author: MattCopenhaver
+
+KeyCoord.lua
