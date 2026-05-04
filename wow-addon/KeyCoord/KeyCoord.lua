@@ -8,6 +8,8 @@ local C = {
   slate700 = { 0.200, 0.255, 0.333 },
   slate400 = { 0.580, 0.639, 0.722 },
   amber400 = { 0.984, 0.749, 0.141 },
+  amber500 = { 0.961, 0.620, 0.043 },
+  amber600 = { 0.851, 0.467, 0.024 },
   white    = { 1.000, 1.000, 1.000 },
 }
 
@@ -27,7 +29,7 @@ local function EnsurePopup()
   if popup then return end
 
   popup = CreateFrame("Frame", "KeyCoordFrame", UIParent)
-  popup:SetSize(540, 112)
+  popup:SetSize(540, 148)
   popup:SetPoint("CENTER")
   popup:SetMovable(true)
   popup:EnableMouse(true)
@@ -97,6 +99,50 @@ local function EnsurePopup()
   editBox:SetTextColor(C.white[1], C.white[2], C.white[3])
   editBox:SetScript("OnEscapePressed", function() popup:Hide() end)
   popup.editBox = editBox
+
+  -- Copy button
+  local copyBtn = CreateFrame("Button", nil, popup)
+  copyBtn:SetSize(110, 28)
+  copyBtn:SetPoint("TOPRIGHT", editWrap, "BOTTOMRIGHT", 0, -10)
+
+  -- Border (slate-700)
+  local copyBtnBorder = solidTex(copyBtn, C.slate700[1], C.slate700[2], C.slate700[3], 1, -1)
+  copyBtnBorder:SetAllPoints()
+  -- Background (slate-900), inset 1px to show border
+  local copyBtnBg = solidTex(copyBtn, C.slate900[1], C.slate900[2], C.slate900[3], 1, 0)
+  copyBtnBg:SetPoint("TOPLEFT",     copyBtn, "TOPLEFT",      1, -1)
+  copyBtnBg:SetPoint("BOTTOMRIGHT", copyBtn, "BOTTOMRIGHT", -1,  1)
+
+  local copyHint = IsMacClient() and "Press Cmd+C" or "Press Ctrl+C"
+
+  local copyBtnTxt = copyBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  copyBtnTxt:SetAllPoints()
+  copyBtnTxt:SetText(copyHint)
+  copyBtnTxt:SetTextColor(C.slate400[1], C.slate400[2], C.slate400[3])
+
+  copyBtn:SetScript("OnEnter", function()
+    copyBtnBorder:SetColorTexture(C.slate400[1], C.slate400[2], C.slate400[3], 1)
+    copyBtnTxt:SetTextColor(C.white[1], C.white[2], C.white[3])
+  end)
+  copyBtn:SetScript("OnLeave", function()
+    copyBtnBorder:SetColorTexture(C.slate700[1], C.slate700[2], C.slate700[3], 1)
+    copyBtnTxt:SetTextColor(C.slate400[1], C.slate400[2], C.slate400[3])
+  end)
+  copyBtn:SetScript("OnClick", function()
+    popup.editBox:SetFocus()
+    popup.editBox:HighlightText()
+  end)
+
+  editBox:SetScript("OnCursorChanged", function(self)
+    self:HighlightText()
+  end)
+
+  editBox:SetScript("OnKeyDown", function(self, key)
+    if key == "C" and (IsMetaKeyDown() or IsControlKeyDown()) then
+      copyBtnTxt:SetText("Copied!")
+      C_Timer.After(2, function() copyBtnTxt:SetText(copyHint) end)
+    end
+  end)
 end
 
 local function toSlug(name)
@@ -153,10 +199,6 @@ local function UpdateKeystoneCache()
   cachedMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
 end
 
-local function IsEligibleForKeys()
-  return UnitLevel("player") == GetMaxPlayerLevel()
-end
-
 local function StartBagWatch()
   if not watchingBags then
     frame:RegisterEvent("BAG_UPDATE_DELAYED")
@@ -172,7 +214,10 @@ local function StopBagWatch()
 end
 
 local function RefreshBagWatch()
-  if IsEligibleForKeys() and cachedLevel == nil then
+  -- Only watch bags when there's no key yet; characters that can't hold
+  -- keystones will always have cachedLevel == nil but the handler is a
+  -- no-op for them since GetOwnedKeystoneLevel() will never return non-nil
+  if cachedLevel == nil then
     StartBagWatch()
   else
     StopBagWatch()
@@ -185,7 +230,7 @@ frame:RegisterEvent("MYTHIC_PLUS_CURRENT_AFFIX_UPDATE")
 
 frame:SetScript("OnEvent", function(self, event)
   if event == "PLAYER_LOGIN" then
-    C_MythicPlus.RequestOwnedKeystoneInfo()
+    if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
     C_Timer.After(1, function()
       UpdateKeystoneCache()
       RefreshBagWatch()
@@ -200,7 +245,7 @@ frame:SetScript("OnEvent", function(self, event)
     end)
 
   elseif event == "MYTHIC_PLUS_CURRENT_AFFIX_UPDATE" then
-    C_MythicPlus.RequestOwnedKeystoneInfo()
+    if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
     C_Timer.After(1, function()
       UpdateKeystoneCache()
       RefreshBagWatch()

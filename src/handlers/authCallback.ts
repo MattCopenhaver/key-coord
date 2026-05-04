@@ -9,10 +9,13 @@ if (CLIENT_SECRET === undefined) throw new Error('BLIZZARD_CLIENT_SECRET not set
 const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+  console.log('authCallback invoked')
+
   const code = event.queryStringParameters?.code
   const redirectUri = event.queryStringParameters?.redirect_uri
 
   if (code === undefined || redirectUri === undefined) {
+    console.log('authCallback 400: missing code or redirect_uri')
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing code or redirect_uri' }) }
   }
 
@@ -30,6 +33,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   })
 
   if (!tokenRes.ok) {
+    console.error('authCallback 401: token exchange failed', tokenRes.status, await tokenRes.text())
     return { statusCode: 401, body: JSON.stringify({ error: 'Token exchange failed' }) }
   }
 
@@ -40,11 +44,13 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   })
 
   if (!userRes.ok) {
+    console.error('authCallback 401: userinfo fetch failed', userRes.status)
     return { statusCode: 401, body: JSON.stringify({ error: 'Failed to fetch user info' }) }
   }
 
   const user = await userRes.json() as { battletag: string }
 
+  console.log('authCallback 200: success', { battletag: user.battletag })
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
