@@ -109,6 +109,7 @@ export default function CharacterSelect (): JSX.Element {
     const selected: SelectedCharacter = {
       name: char.name,
       realm: char.realm,
+      realmSlug: char.realmSlug,
       region,
       guild: char.guild,
       guildRealm: char.guildRealm,
@@ -170,7 +171,7 @@ export default function CharacterSelect (): JSX.Element {
           <div className="space-y-2">
             {guildChars.map(char => (
               <button
-                key={`${char.realm}-${char.name}`}
+                key={`${char.realmSlug}-${char.name}`}
                 onClick={() => { onSelect(char) }}
                 className="flex w-full items-center gap-3 sm:gap-4 rounded-xl border border-slate-800 bg-slate-900 px-4 sm:px-5 py-3 sm:py-4 text-left transition hover:border-slate-700 hover:bg-slate-800"
               >
@@ -201,7 +202,7 @@ export default function CharacterSelect (): JSX.Element {
             <div className="space-y-1">
               {noGuildChars.map(char => (
                 <div
-                  key={`${char.realm}-${char.name}`}
+                  key={`${char.realmSlug}-${char.name}`}
                   className="flex items-center justify-between rounded-lg px-4 py-2.5 text-slate-600"
                 >
                   <span className="text-sm">{char.name} — {char.realm}</span>

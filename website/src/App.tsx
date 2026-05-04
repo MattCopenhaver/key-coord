@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { getDungeonName } from './data/dungeons'
 import Select from './components/Select'
 import { getClassColor, classColorById } from './data/classes'
@@ -44,10 +44,14 @@ function SortIcon ({ field, sortField, sortDir }: { field: SortField, sortField:
 }
 
 export default function App (): JSX.Element {
-  const { user, login, logout, selectedCharacter, clearCharacter } = useAuth()
+  const { user, login, logout, selectedCharacter, clearCharacter, pendingKey, clearPendingKey } = useAuth()
   const [keys, setKeys] = useState<Key[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const hasSubmittedRef = useRef(false)
   const [sortField, setSortField] = useState<SortField>('keyLevel')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [dungeonMedia, setDungeonMedia] = useState<Map<number, string>>(new Map())
@@ -63,7 +67,7 @@ export default function App (): JSX.Element {
     setError(null)
     try {
       const { region, guildRealm, guild } = selectedCharacter
-      const guildId = `${region}-${guildRealm}-${guild}`
+      const guildId = `${region}-${guildRealm}-${guild}`.toLowerCase()
       const res = await fetch(`/api/keys/${encodeURIComponent(guildId)}`)
       if (!res.ok) throw new Error(`Request failed: ${res.status}`)
       const data = await res.json() as { keys: Key[] }
@@ -141,6 +145,66 @@ export default function App (): JSX.Element {
       setMemberColors(map)
     }).catch(() => {})
   }, [user, selectedCharacter])
+
+  const handleSubmitKey = useCallback(async (): Promise<void> => {
+    if (pendingKey === null || user === null) return
+    setSubmitError(null)
+    setSubmitLoading(true)
+    try {
+      const region = pendingKey.region.toLowerCase()
+      const profileRes = await fetch(
+        `https://${region}.api.blizzard.com/profile/user/wow?namespace=profile-${region}&locale=en_US`,
+        { headers: { Authorization: `Bearer ${user.accessToken}` } },
+      )
+      if (!profileRes.ok) throw new Error('Could not verify character ownership')
+      const profile = await profileRes.json() as { wow_accounts: Array<{ characters: Array<{ name: string, realm: { slug: string } }> }> }
+      const chars = profile.wow_accounts.flatMap(a => a.characters)
+      const owned = chars.some(
+        c => c.name.toLowerCase() === pendingKey.characterName.toLowerCase() &&
+             c.realm.slug.toLowerCase() === pendingKey.realm.toLowerCase(),
+      )
+      if (!owned) {
+        throw new Error(`${pendingKey.characterName} is not a character on your Battle.net account`)
+      }
+
+      const guildId = `${pendingKey.region}-${pendingKey.guildRealm}-${pendingKey.guild}`.toLowerCase()
+      const res = await fetch(
+        `/api/keys/${encodeURIComponent(guildId)}/${encodeURIComponent(pendingKey.characterName)}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${user.accessToken}`,
+          },
+          body: JSON.stringify({
+            dungeonId: pendingKey.dungeonId,
+            keyLevel: pendingKey.keyLevel,
+            region: pendingKey.region.toLowerCase(),
+            realmSlug: pendingKey.realm,
+          }),
+        },
+      )
+      if (!res.ok) {
+        const data = await res.json() as { error?: string }
+        throw new Error(data.error ?? 'Submission failed')
+      }
+      clearPendingKey()
+      window.history.replaceState(null, '', window.location.pathname)
+      void fetchKeys()
+      setSubmitSuccess(`+${pendingKey.keyLevel} ${getDungeonName(pendingKey.dungeonId)} submitted for ${pendingKey.characterName}`)
+      setTimeout(() => { setSubmitSuccess(null) }, 7000)
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Submission failed')
+    } finally {
+      setSubmitLoading(false)
+    }
+  }, [pendingKey, user, fetchKeys, clearPendingKey])
+
+  useEffect(() => {
+    if (pendingKey === null || user === null || hasSubmittedRef.current) return
+    hasSubmittedRef.current = true
+    void handleSubmitKey()
+  }, [pendingKey, user, handleSubmitKey])
 
   const onSort = (field: SortField): void => {
     if (field === sortField) {
@@ -252,26 +316,34 @@ export default function App (): JSX.Element {
           </div>
         )}
 
+        {submitLoading && (
+          <div className="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-400">
+            <div className="h-4 w-4 animate-spin rounded-full border border-slate-600 border-t-amber-400 flex-shrink-0" />
+            Submitting your key…
+          </div>
+        )}
+
+        {submitSuccess !== null && (
+          <div className="flex items-center justify-between rounded-lg border border-green-800 bg-green-950/50 px-4 py-3 text-sm text-green-400">
+            <span>{submitSuccess}</span>
+            <button onClick={() => { setSubmitSuccess(null) }} className="ml-4 text-green-600 hover:text-green-400">Dismiss</button>
+          </div>
+        )}
+
+        {submitError !== null && (
+          <div className="flex items-center justify-between rounded-lg border border-red-800 bg-red-950/50 px-4 py-3 text-sm text-red-400">
+            <span>Failed to submit key: {submitError}</span>
+            <button onClick={() => { setSubmitError(null) }} className="ml-4 text-red-600 hover:text-red-400">Dismiss</button>
+          </div>
+        )}
+
         {error !== null && (
           <div className="rounded-lg border border-red-800 bg-red-950/50 px-4 py-3 text-sm text-red-400">
             {error}
           </div>
         )}
 
-        {loading && (
-          <div className="flex items-center justify-center py-20 gap-3 text-sm text-slate-500">
-            <div className="h-4 w-4 animate-spin rounded-full border border-slate-600 border-t-amber-400" />
-            Loading keys…
-          </div>
-        )}
-
-        {!loading && selectedCharacter !== null && keys.length === 0 && error === null && (
-          <div className="rounded-xl border border-slate-800 bg-slate-900 py-16 text-center">
-            <p className="text-slate-500">No keys found for <span className="text-slate-300">{selectedCharacter.guild}</span>.</p>
-          </div>
-        )}
-
-        {keys.length > 0 && selectedCharacter !== null && (
+        {selectedCharacter !== null && (
           <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
             <div className="flex items-center justify-between border-b border-slate-800 px-4 sm:px-6 py-4">
               <div>
@@ -279,9 +351,11 @@ export default function App (): JSX.Element {
                 <p className="text-sm text-slate-500">{selectedCharacter.guildRealmName} · {selectedCharacter.region}</p>
               </div>
               <div className="flex items-center gap-3">
-                <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-sm font-medium text-slate-300">
-                  {sortedKeys.length}{sortedKeys.length !== keys.length && <span className="text-slate-500"> / {keys.length}</span>} {sortedKeys.length === 1 ? 'key' : 'keys'}
-                </span>
+                {!loading && (
+                  <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-sm font-medium text-slate-300">
+                    {sortedKeys.length}{sortedKeys.length !== keys.length && <span className="text-slate-500"> / {keys.length}</span>} {sortedKeys.length === 1 ? 'key' : 'keys'}
+                  </span>
+                )}
                 <button
                   onClick={() => { void fetchKeys() }}
                   className="text-sm text-slate-500 transition hover:text-amber-400"
@@ -290,6 +364,21 @@ export default function App (): JSX.Element {
                 </button>
               </div>
             </div>
+
+            {loading && (
+              <div className="flex items-center justify-center gap-3 py-20 text-sm text-slate-500">
+                <div className="h-4 w-4 animate-spin rounded-full border border-slate-600 border-t-amber-400" />
+                Loading keys…
+              </div>
+            )}
+
+            {!loading && keys.length === 0 && error === null && (
+              <div className="py-16 text-center">
+                <p className="text-slate-500">No keys found for <span className="text-slate-300">{selectedCharacter.guild}</span>.</p>
+              </div>
+            )}
+
+            {!loading && keys.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm sm:text-base">
                 <thead>
@@ -375,6 +464,7 @@ export default function App (): JSX.Element {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
       </div>
