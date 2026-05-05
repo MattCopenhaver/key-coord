@@ -237,7 +237,6 @@ frame:SetScript("OnEvent", function(self, event)
 
   elseif event == "CHALLENGE_MODE_COMPLETED" then
     C_Timer.After(3, function()
-<<<<<<< HEAD
       local newLevel = C_MythicPlus.GetOwnedKeystoneLevel()
       local newMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
       if newLevel ~= nil and (newLevel ~= cachedLevel or newMapID ~= cachedMapID) then
@@ -245,10 +244,6 @@ frame:SetScript("OnEvent", function(self, event)
         cachedMapID = newMapID
         ShowKeystonePopup()
       end
-=======
-      UpdateKeystoneCache()
-      ShowKeystonePopup()
->>>>>>> origin/main
       RefreshBagWatch()
     end)
 
