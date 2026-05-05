@@ -1,4 +1,4 @@
-## Interface: 110107
+## Interface: 120005
 ## Title: KeyCoord
 ## Notes: Coordinate Mythic+ keys with your guild
 ## Version: 1.0.0
