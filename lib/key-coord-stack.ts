@@ -8,6 +8,8 @@ import * as s3 from 'aws-cdk-lib/aws-s3'
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import * as cloudfrontOrigins from 'aws-cdk-lib/aws-cloudfront-origins'
+import * as events from 'aws-cdk-lib/aws-events'
+import * as eventsTargets from 'aws-cdk-lib/aws-events-targets'
 import { type Construct } from 'constructs'
 
 interface KeyCoordStackProps extends cdk.StackProps {
@@ -72,6 +74,36 @@ export class KeyCoordStack extends cdk.Stack {
     table.grantReadWriteData(putKeyFn)
     table.grantReadData(getGuildKeysFn)
     table.grantReadWriteData(deleteKeyFn)
+
+    const purgeKeysFn = new lambdaNodejs.NodejsFunction(this, `key-coord-purge-keys${suffix}`, {
+      ...handlerDefaults,
+      functionName: `key-coord-purge-keys${suffix}`,
+      entry: 'src/handlers/purgeKeys.ts',
+    })
+    table.grantReadWriteData(purgeKeysFn)
+
+    // WoW weekly reset times (UTC). Purge fires at reset so old keys are cleared
+    // before players submit new ones.
+    // US:  Tuesday  15:00 UTC (11 AM EDT / 8 AM PDT)
+    // EU:  Wednesday 07:00 UTC (9 AM CEST / 8 AM CET)
+    // KR:  Wednesday 17:00 UTC (2 AM KST Thursday) — approximate
+    // TW:  Wednesday 16:00 UTC (midnight TST Thursday) — approximate
+    const resetSchedules: Array<{ id: string, region: string, schedule: events.Schedule }> = [
+      { id: 'us', region: 'us', schedule: events.Schedule.cron({ minute: '0', hour: '15', weekDay: 'TUE' }) },
+      { id: 'eu', region: 'eu', schedule: events.Schedule.cron({ minute: '0', hour: '7', weekDay: 'WED' }) },
+      { id: 'kr', region: 'kr', schedule: events.Schedule.cron({ minute: '0', hour: '17', weekDay: 'WED' }) },
+      { id: 'tw', region: 'tw', schedule: events.Schedule.cron({ minute: '0', hour: '16', weekDay: 'WED' }) },
+    ]
+
+    for (const { id, region, schedule } of resetSchedules) {
+      const rule = new events.Rule(this, `key-coord-weekly-reset-${id}${suffix}`, {
+        ruleName: `key-coord-weekly-reset-${id}${suffix}`,
+        schedule,
+      })
+      rule.addTarget(new eventsTargets.LambdaFunction(purgeKeysFn, {
+        event: events.RuleTargetInput.fromObject({ region }),
+      }))
+    }
 
     const httpApi = new apigateway.HttpApi(this, `key-coord-api${suffix}`, {
       apiName: `key-coord-api${suffix}`,
