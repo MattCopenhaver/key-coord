@@ -244,16 +244,15 @@ frame:SetScript("OnEvent", function(self, event)
     end)
 
   elseif event == "CHALLENGE_MODE_COMPLETED" then
-    C_Timer.After(3, function()
-      local newLevel = C_MythicPlus.GetOwnedKeystoneLevel()
-      local newMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
-      if newLevel ~= nil and (newLevel ~= cachedLevel or newMapID ~= cachedMapID) then
-        cachedLevel = newLevel
-        cachedMapID = newMapID
-        ShowKeystonePopup()
-      end
-      RefreshBagWatch()
-    end)
+    local newLevel = C_MythicPlus.GetOwnedKeystoneLevel()
+    local newMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+    if newLevel ~= nil and (newLevel ~= cachedLevel or newMapID ~= cachedMapID) then
+      cachedLevel = newLevel
+      cachedMapID = newMapID
+      ShowKeystonePopup()
+    else
+      StartBagWatch()
+    end
 
   elseif event == "MYTHIC_PLUS_CURRENT_AFFIX_UPDATE" then
     if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
@@ -277,3 +276,11 @@ end)
 SLASH_KEYCOORD1 = "/keycoord"
 SLASH_KEYCOORD2 = "/kc"
 SlashCmdList["KEYCOORD"] = ShowKeystonePopup
+
+SLASH_KCTEST1 = "/kctest"
+SlashCmdList["KCTEST"] = function()
+  cachedLevel = nil
+  cachedMapID = nil
+  StartBagWatch()
+  print("|cffff9900KeyCoord:|r Bag watch started — move any item in a bag to trigger.")
+end
