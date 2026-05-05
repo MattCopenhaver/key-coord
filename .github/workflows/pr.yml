@@ -4,7 +4,30 @@ on:
   pull_request:
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      website: ${{ steps.filter.outputs.website }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'src/**'
+              - 'lib/**'
+              - 'bin/**'
+              - 'package*.json'
+              - 'tsconfig.json'
+              - 'cdk.json'
+            website:
+              - 'website/**'
+
   lint:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.website == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -12,15 +35,20 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-      - run: npm ci
-      - run: npm run lint
-      - run: npx tsc --noEmit
+      - name: Lint and typecheck backend
+        if: needs.changes.outputs.backend == 'true'
+        run: npm ci && npm run lint && npx tsc --noEmit
       - name: Lint and typecheck website
+        if: needs.changes.outputs.website == 'true'
         working-directory: website
         run: npm ci && npm run lint && npm run typecheck
 
   deploy:
-    needs: lint
+    needs: [changes, lint]
+    if: |
+      always() &&
+      needs.lint.result != 'failure' &&
+      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.website == 'true')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +74,11 @@ jobs:
         run: npm run deploy -- key-coord --context envSuffix=dev --require-approval never
 
   test:
-    needs: deploy
+    needs: [changes, deploy]
+    if: |
+      always() &&
+      needs.deploy.result != 'failure' &&
+      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.website == 'true')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
