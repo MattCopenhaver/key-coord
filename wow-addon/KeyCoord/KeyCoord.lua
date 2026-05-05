@@ -189,9 +189,7 @@ local function ShowKeystonePopup()
 
   EnsurePopup()
   popup.editBox:SetText(url)
-  popup.editBox:HighlightText()
   popup:Show()
-  popup.editBox:SetFocus()
 end
 
 local function UpdateKeystoneCache()
@@ -239,8 +237,13 @@ frame:SetScript("OnEvent", function(self, event)
 
   elseif event == "CHALLENGE_MODE_COMPLETED" then
     C_Timer.After(3, function()
-      UpdateKeystoneCache()
-      ShowKeystonePopup()
+      local newLevel = C_MythicPlus.GetOwnedKeystoneLevel()
+      local newMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+      if newLevel ~= nil and (newLevel ~= cachedLevel or newMapID ~= cachedMapID) then
+        cachedLevel = newLevel
+        cachedMapID = newMapID
+        ShowKeystonePopup()
+      end
       RefreshBagWatch()
     end)
 
