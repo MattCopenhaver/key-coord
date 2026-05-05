@@ -117,7 +117,7 @@ local function EnsurePopup()
 
   local copyBtnTxt = copyBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   copyBtnTxt:SetAllPoints()
-  copyBtnTxt:SetText(copyHint)
+  copyBtnTxt:SetText("Select Link")
   copyBtnTxt:SetTextColor(C.slate400[1], C.slate400[2], C.slate400[3])
 
   copyBtn:SetScript("OnEnter", function()
@@ -131,16 +131,24 @@ local function EnsurePopup()
   copyBtn:SetScript("OnClick", function()
     popup.editBox:SetFocus()
     popup.editBox:HighlightText()
+    copyBtnTxt:SetText(copyHint)
+    C_Timer.After(3, function() copyBtnTxt:SetText("Select Link") end)
   end)
 
   editBox:SetScript("OnCursorChanged", function(self)
-    self:HighlightText()
+    if self:HasFocus() then
+      self:HighlightText()
+    end
   end)
 
   editBox:SetScript("OnKeyDown", function(self, key)
     if key == "C" and (IsMetaKeyDown() or IsControlKeyDown()) then
       copyBtnTxt:SetText("Copied!")
-      C_Timer.After(2, function() copyBtnTxt:SetText(copyHint) end)
+      UIFrameFadeOut(popup, 0.5, 1, 0)
+      C_Timer.After(0.5, function()
+        popup:Hide()
+        popup:SetAlpha(1)
+      end)
     end
   end)
 end
@@ -237,7 +245,6 @@ frame:SetScript("OnEvent", function(self, event)
 
   elseif event == "CHALLENGE_MODE_COMPLETED" then
     C_Timer.After(3, function()
-<<<<<<< HEAD
       local newLevel = C_MythicPlus.GetOwnedKeystoneLevel()
       local newMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
       if newLevel ~= nil and (newLevel ~= cachedLevel or newMapID ~= cachedMapID) then
@@ -245,10 +252,6 @@ frame:SetScript("OnEvent", function(self, event)
         cachedMapID = newMapID
         ShowKeystonePopup()
       end
-=======
-      UpdateKeystoneCache()
-      ShowKeystonePopup()
->>>>>>> origin/main
       RefreshBagWatch()
     end)
 
