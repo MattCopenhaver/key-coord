@@ -18,6 +18,7 @@ local cachedLevel = nil
 local cachedMapID = nil
 local loginTime = 0
 local LOGIN_SETTLE = 5
+local inDungeon = false
 local frame = CreateFrame("Frame")
 
 local function solidTex(parent, r, g, b, a, sublevel)
@@ -208,39 +209,61 @@ local function CheckAndUpdateKeystone()
   local changed = newLevel ~= cachedLevel or newMapID ~= cachedMapID
   cachedLevel = newLevel
   cachedMapID = newMapID
-  if changed and GetTime() - loginTime > LOGIN_SETTLE then
+  if changed and not inDungeon and GetTime() - loginTime > LOGIN_SETTLE then
     ShowKeystonePopup()
   end
 end
 
 frame:RegisterEvent("PLAYER_LOGIN")
+frame:RegisterEvent("CHALLENGE_MODE_START")
 frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
-frame:RegisterEvent("MYTHIC_PLUS_CURRENT_AFFIX_UPDATE")
+frame:RegisterEvent("CHALLENGE_MODE_RESET")
 frame:RegisterEvent("BAG_UPDATE_DELAYED")
+frame:RegisterEvent("GOSSIP_CLOSED")
 
 frame:SetScript("OnEvent", function(self, event)
   if event == "PLAYER_LOGIN" then
     loginTime = GetTime()
+    -- Restore in-dungeon state if reconnecting mid-run
+    local activeLevel = C_ChallengeMode.GetActiveKeystoneInfo()
+    if activeLevel and activeLevel > 0 then
+      inDungeon = true
+    end
     if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
     C_Timer.After(1, function()
       CheckAndUpdateKeystone()  -- settle period blocks any popup
       print("|cffff9900KeyCoord:|r Type /keycoord or /kc to submit your Mythic+ key.")
     end)
 
-  elseif event == "CHALLENGE_MODE_COMPLETED" then
+  elseif event == "CHALLENGE_MODE_START" then
+    inDungeon = true
+    -- silently cache the new key that appears in bags at dungeon start
     if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
-    C_Timer.After(1, function()
+    C_Timer.After(2, function()
+      CheckAndUpdateKeystone()  -- inDungeon=true suppresses any popup
+    end)
+
+  elseif event == "CHALLENGE_MODE_COMPLETED" then
+    inDungeon = false
+    if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
+    C_Timer.After(3, function()
       CheckAndUpdateKeystone()
     end)
 
-  elseif event == "MYTHIC_PLUS_CURRENT_AFFIX_UPDATE" then
-    C_Timer.After(1, function()
-      CheckAndUpdateKeystone()
-    end)
+  elseif event == "CHALLENGE_MODE_RESET" then
+    inDungeon = false
 
   elseif event == "BAG_UPDATE_DELAYED" then
     if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
     C_Timer.After(1, function()
+      CheckAndUpdateKeystone()
+    end)
+
+  elseif event == "GOSSIP_CLOSED" then
+    -- Catches NPC key trades (e.g. end-of-dungeon key exchange) which don't reliably
+    -- trigger a bag update before the server commits the new keystone
+    if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
+    C_Timer.After(3, function()
       CheckAndUpdateKeystone()
     end)
   end
