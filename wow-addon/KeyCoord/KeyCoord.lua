@@ -16,6 +16,7 @@ local C = {
 local popup
 local cachedLevel = nil
 local cachedMapID = nil
+local initialized = false
 local frame = CreateFrame("Frame")
 
 local function solidTex(parent, r, g, b, a, sublevel)
@@ -214,6 +215,7 @@ frame:SetScript("OnEvent", function(self, event)
     if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
     C_Timer.After(1, function()
       UpdateKeystoneCache()
+      initialized = true
       print("|cffff9900KeyCoord:|r Type /keycoord or /kc to submit your Mythic+ key.")
     end)
 
@@ -233,6 +235,7 @@ frame:SetScript("OnEvent", function(self, event)
     end)
 
   elseif event == "BAG_UPDATE_DELAYED" then
+    if not initialized then return end
     local newLevel = C_MythicPlus.GetOwnedKeystoneLevel()
     local newMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
     if newLevel ~= nil and (newLevel ~= cachedLevel or newMapID ~= cachedMapID) then
