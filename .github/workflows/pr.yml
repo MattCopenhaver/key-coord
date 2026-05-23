@@ -9,6 +9,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       website: ${{ steps.filter.outputs.website }}
+      addon: ${{ steps.filter.outputs.addon }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -24,6 +25,8 @@ jobs:
               - 'cdk.json'
             website:
               - 'website/**'
+            addon:
+              - 'wow-addon/**'
 
   lint:
     needs: changes
@@ -72,6 +75,45 @@ jobs:
           BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
           BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
         run: npm run deploy -- key-coord --context envSuffix=dev --require-approval never
+
+  deploy-addon:
+    needs: changes
+    if: needs.changes.outputs.addon == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from TOC
+        id: toc
+        run: |
+          VERSION=$(grep "^## Version:" wow-addon/KeyCoord/KeyCoord.toc | sed 's/## Version: *//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Package addon
+        run: |
+          cd wow-addon
+          zip -r ../KeyCoord-${{ steps.toc.outputs.version }}-alpha.${{ github.run_number }}.zip KeyCoord/ -x "**/__MACOSX/*" -x "**/.DS_Store"
+
+      - name: Get CurseForge game version ID
+        id: cfver
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: |
+          VERSION_ID=$(curl -sf -H "X-Api-Token: $CURSEFORGE_TOKEN" \
+            "https://wow.curseforge.com/api/game/versions" | \
+            jq '[.[] | select(.gameVersionTypeID == 517)] | sort_by(.id) | last | .id')
+          echo "id=$VERSION_ID" >> $GITHUB_OUTPUT
+
+      - name: Upload to CurseForge as alpha
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          PROJECT_ID: ${{ secrets.CURSEFORGE_PROJECT_ID }}
+        run: |
+          curl -sf -X POST \
+            -H "X-Api-Token: $CURSEFORGE_TOKEN" \
+            -F "metadata={\"gameVersions\":[${{ steps.cfver.outputs.id }}],\"displayName\":\"${{ steps.toc.outputs.version }}-alpha.${{ github.run_number }}\",\"releaseType\":\"alpha\"}" \
+            -F "file=@KeyCoord-${{ steps.toc.outputs.version }}-alpha.${{ github.run_number }}.zip" \
+            "https://wow.curseforge.com/api/projects/$PROJECT_ID/upload-file"
 
   test:
     needs: [changes, deploy]
