@@ -71,6 +71,11 @@ jobs:
         run: |
           VERSION=$(grep "^## Version:" wow-addon/KeyCoord/KeyCoord.toc | sed 's/## Version: *//')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          INTERFACE=$(grep "^## Interface:" wow-addon/KeyCoord/KeyCoord.toc | sed 's/## Interface: *//')
+          MAJOR=$((INTERFACE / 10000))
+          MINOR=$(( (INTERFACE % 10000) / 100 ))
+          PATCH=$((INTERFACE % 100))
+          echo "gameVersion=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
 
       - name: Package addon
         run: |
@@ -81,10 +86,11 @@ jobs:
         id: cfver
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          GAME_VERSION: ${{ steps.toc.outputs.gameVersion }}
         run: |
           VERSION_ID=$(curl -s --fail-with-body -H "X-Api-Token: $CURSEFORGE_TOKEN" \
             "https://wow.curseforge.com/api/game/versions" | \
-            jq '[.[] | select(.gameVersionTypeID == 517)] | sort_by(.id) | last | .id')
+            jq --arg v "$GAME_VERSION" '[.[] | select(.gameVersionTypeID == 517 and .name == $v)] | first | .id')
           echo "id=$VERSION_ID" >> $GITHUB_OUTPUT
 
       - name: Upload to CurseForge
