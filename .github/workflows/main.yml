@@ -94,6 +94,6 @@ jobs:
         run: |
           curl -s --fail-with-body -X POST \
             -H "X-Api-Token: $CURSEFORGE_TOKEN" \
-            -F "metadata={\"gameVersions\":[${{ steps.cfver.outputs.id }}],\"displayName\":\"${{ steps.toc.outputs.version }}\",\"releaseType\":\"release\"}" \
+            -F "metadata={\"gameVersions\":[${{ steps.cfver.outputs.id }}],\"displayName\":\"${{ steps.toc.outputs.version }}\",\"releaseType\":\"release\",\"changelog\":\"\",\"changelogType\":\"text\"}" \
             -F "file=@KeyCoord-${{ steps.toc.outputs.version }}.zip" \
             "https://wow.curseforge.com/api/projects/$PROJECT_ID/upload-file"

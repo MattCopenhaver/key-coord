@@ -111,7 +111,7 @@ jobs:
         run: |
           curl -s --fail-with-body -X POST \
             -H "X-Api-Token: $CURSEFORGE_TOKEN" \
-            -F "metadata={\"gameVersions\":[${{ steps.cfver.outputs.id }}],\"displayName\":\"${{ steps.toc.outputs.version }}-alpha.${{ github.run_number }}\",\"releaseType\":\"alpha\"}" \
+            -F "metadata={\"gameVersions\":[${{ steps.cfver.outputs.id }}],\"displayName\":\"${{ steps.toc.outputs.version }}-alpha.${{ github.run_number }}\",\"releaseType\":\"alpha\",\"changelog\":\"\",\"changelogType\":\"text\"}" \
             -F "file=@KeyCoord-${{ steps.toc.outputs.version }}-alpha.${{ github.run_number }}.zip" \
             "https://wow.curseforge.com/api/projects/$PROJECT_ID/upload-file"
 
