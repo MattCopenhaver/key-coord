@@ -16,7 +16,8 @@ local C = {
 local popup
 local cachedLevel = nil
 local cachedMapID = nil
-local initialized = false
+local loginTime = 0
+local LOGIN_SETTLE = 5
 local frame = CreateFrame("Frame")
 
 local function solidTex(parent, r, g, b, a, sublevel)
@@ -200,9 +201,16 @@ local function ShowKeystonePopup()
   popup:Show()
 end
 
-local function UpdateKeystoneCache()
-  cachedLevel = C_MythicPlus.GetOwnedKeystoneLevel()
-  cachedMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+local function CheckAndUpdateKeystone()
+  local newLevel = C_MythicPlus.GetOwnedKeystoneLevel()
+  local newMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+  if newLevel == nil then return end
+  local changed = newLevel ~= cachedLevel or newMapID ~= cachedMapID
+  cachedLevel = newLevel
+  cachedMapID = newMapID
+  if changed and GetTime() - loginTime > LOGIN_SETTLE then
+    ShowKeystonePopup()
+  end
 end
 
 frame:RegisterEvent("PLAYER_LOGIN")
@@ -212,37 +220,29 @@ frame:RegisterEvent("BAG_UPDATE_DELAYED")
 
 frame:SetScript("OnEvent", function(self, event)
   if event == "PLAYER_LOGIN" then
+    loginTime = GetTime()
     if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
     C_Timer.After(1, function()
-      UpdateKeystoneCache()
-      initialized = true
+      CheckAndUpdateKeystone()  -- settle period blocks any popup
       print("|cffff9900KeyCoord:|r Type /keycoord or /kc to submit your Mythic+ key.")
     end)
 
   elseif event == "CHALLENGE_MODE_COMPLETED" then
-    local newLevel = C_MythicPlus.GetOwnedKeystoneLevel()
-    local newMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
-    if newLevel ~= nil and (newLevel ~= cachedLevel or newMapID ~= cachedMapID) then
-      cachedLevel = newLevel
-      cachedMapID = newMapID
-      ShowKeystonePopup()
-    end
-
-  elseif event == "MYTHIC_PLUS_CURRENT_AFFIX_UPDATE" then
     if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
     C_Timer.After(1, function()
-      UpdateKeystoneCache()
+      CheckAndUpdateKeystone()
+    end)
+
+  elseif event == "MYTHIC_PLUS_CURRENT_AFFIX_UPDATE" then
+    C_Timer.After(1, function()
+      CheckAndUpdateKeystone()
     end)
 
   elseif event == "BAG_UPDATE_DELAYED" then
-    if not initialized then return end
-    local newLevel = C_MythicPlus.GetOwnedKeystoneLevel()
-    local newMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
-    if newLevel ~= nil and (newLevel ~= cachedLevel or newMapID ~= cachedMapID) then
-      cachedLevel = newLevel
-      cachedMapID = newMapID
-      ShowKeystonePopup()
-    end
+    if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
+    C_Timer.After(1, function()
+      CheckAndUpdateKeystone()
+    end)
   end
 end)
 
