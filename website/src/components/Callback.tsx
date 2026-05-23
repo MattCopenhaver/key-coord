@@ -32,7 +32,12 @@ export default function Callback (): JSX.Element {
     fetch(url)
       .then(async res => {
         if (!res.ok) throw new Error('Login failed')
-        return await res.json() as AuthUser
+        const data = await res.json() as { battletag: string, accessToken: string, expiresIn: number }
+        return {
+          battletag: data.battletag,
+          accessToken: data.accessToken,
+          expiresAt: Date.now() + data.expiresIn * 1000,
+        } satisfies AuthUser
       })
       .then(user => {
         completeLogin(user)

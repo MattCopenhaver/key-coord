@@ -4,6 +4,7 @@ import { type Region } from '../data/realms'
 export interface AuthUser {
   battletag: string
   accessToken: string
+  expiresAt: number
 }
 
 export interface SelectedCharacter {
@@ -32,8 +33,10 @@ interface AuthContextValue {
   user: AuthUser | null
   selectedCharacter: SelectedCharacter | null
   pendingKey: PendingKey | null
+  sessionExpired: boolean
   login: () => void
   logout: () => void
+  expireSession: () => void
   completeLogin: (user: AuthUser) => void
   selectCharacter: (char: SelectedCharacter) => void
   clearCharacter: () => void
@@ -70,14 +73,27 @@ function loadJson<T> (key: string, storage: Storage = localStorage): T | null {
   }
 }
 
+function loadAndValidateAuth (): { user: AuthUser | null, sessionExpired: boolean } {
+  const stored = loadJson<AuthUser>(AUTH_KEY)
+  if (stored === null) return { user: null, sessionExpired: false }
+  if (stored.expiresAt < Date.now()) {
+    localStorage.removeItem(AUTH_KEY)
+    localStorage.removeItem(CHAR_KEY)
+    return { user: null, sessionExpired: true }
+  }
+  return { user: stored, sessionExpired: false }
+}
+
 export function AuthProvider ({ children }: { children: ReactNode }): JSX.Element {
-  const [user, setUser] = useState<AuthUser | null>(() => loadJson<AuthUser>(AUTH_KEY))
+  const [{ user: initialUser, sessionExpired: initialSessionExpired }] = useState(loadAndValidateAuth)
+  const [user, setUser] = useState<AuthUser | null>(initialUser)
   const [selectedCharacter, setSelectedCharacter] = useState<SelectedCharacter | null>(() => {
     const char = loadJson<SelectedCharacter>(CHAR_KEY)
     if (char?.guildRealm === undefined || char.guildRealmName === undefined) return null
     return char
   })
   const [pendingKey, setPendingKey] = useState<PendingKey | null>(() => loadJson<PendingKey>(PENDING_KEY_KEY, sessionStorage))
+  const [sessionExpired, setSessionExpired] = useState(initialSessionExpired)
 
   useEffect(() => {
     if (window.location.pathname === '/callback') return
@@ -109,8 +125,18 @@ export function AuthProvider ({ children }: { children: ReactNode }): JSX.Elemen
     setPendingKey(null)
   }
 
+  const expireSession = useCallback((): void => {
+    localStorage.removeItem(AUTH_KEY)
+    localStorage.removeItem(CHAR_KEY)
+    setUser(null)
+    setSelectedCharacter(null)
+    setSessionExpired(true)
+    // pendingKey intentionally preserved so it auto-submits after re-login
+  }, [])
+
   const completeLogin = useCallback((authUser: AuthUser): void => {
     localStorage.setItem(AUTH_KEY, JSON.stringify(authUser))
+    setSessionExpired(false)
     setUser(authUser)
   }, [])
 
@@ -130,7 +156,7 @@ export function AuthProvider ({ children }: { children: ReactNode }): JSX.Elemen
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, selectedCharacter, pendingKey, login, logout, completeLogin, selectCharacter, clearCharacter, clearPendingKey }}>
+    <AuthContext.Provider value={{ user, selectedCharacter, pendingKey, sessionExpired, login, logout, expireSession, completeLogin, selectCharacter, clearCharacter, clearPendingKey }}>
       {children}
     </AuthContext.Provider>
   )
