@@ -9,6 +9,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       website: ${{ steps.filter.outputs.website }}
+      addon: ${{ steps.filter.outputs.addon }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -24,6 +25,8 @@ jobs:
               - 'cdk.json'
             website:
               - 'website/**'
+            addon:
+              - 'wow-addon/**'
 
   lint:
     needs: changes
@@ -72,6 +75,66 @@ jobs:
           BLIZZARD_CLIENT_ID: ${{ secrets.BLIZZARD_CLIENT_ID }}
           BLIZZARD_CLIENT_SECRET: ${{ secrets.BLIZZARD_CLIENT_SECRET }}
         run: npm run deploy -- key-coord --context envSuffix=dev --require-approval never
+
+  deploy-addon:
+    needs: changes
+    if: needs.changes.outputs.addon == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from TOC
+        id: toc
+        run: |
+          VERSION=$(grep "^## Version:" wow-addon/KeyCoord/KeyCoord.toc | sed 's/## Version: *//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          INTERFACE=$(grep "^## Interface:" wow-addon/KeyCoord/KeyCoord.toc | sed 's/## Interface: *//')
+          MAJOR=$((INTERFACE / 10000))
+          MINOR=$(( (INTERFACE % 10000) / 100 ))
+          PATCH=$((INTERFACE % 100))
+          echo "gameVersion=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
+
+      - name: Package addon
+        run: |
+          cd wow-addon
+          zip -r ../KeyCoord-${{ steps.toc.outputs.version }}-alpha.${{ github.run_number }}.zip KeyCoord/ -x "**/__MACOSX/*" -x "**/.DS_Store"
+
+      - name: Get CurseForge game version ID
+        id: cfver
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          GAME_VERSION: ${{ steps.toc.outputs.gameVersion }}
+        run: |
+          VERSION_ID=$(curl -s --fail-with-body -H "X-Api-Token: $CURSEFORGE_TOKEN" \
+            "https://wow.curseforge.com/api/game/versions" | \
+            jq --arg v "$GAME_VERSION" '[.[] | select(.gameVersionTypeID == 517 and .name == $v)] | first | .id')
+          echo "id=$VERSION_ID" >> $GITHUB_OUTPUT
+
+      - name: Upload to CurseForge as alpha
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          PROJECT_ID: ${{ secrets.CURSEFORGE_PROJECT_ID }}
+          VERSION: ${{ steps.toc.outputs.version }}
+          RUN_NUMBER: ${{ github.run_number }}
+          GAME_VERSION_ID: ${{ steps.cfver.outputs.id }}
+        run: |
+          DISPLAY_NAME="${VERSION}-alpha.${RUN_NUMBER}"
+          METADATA=$(printf '{"gameVersions":[%s],"displayName":"%s","releaseType":"alpha","changelog":"","changelogType":"text"}' \
+            "$GAME_VERSION_ID" "$DISPLAY_NAME")
+          echo "Uploading KeyCoord-${DISPLAY_NAME}.zip with metadata: $METADATA"
+          HTTP_CODE=$(curl -s -o /tmp/cf_response.json -w "%{http_code}" -X POST \
+            -H "X-Api-Token: $CURSEFORGE_TOKEN" \
+            -F "metadata=$METADATA" \
+            -F "file=@KeyCoord-${DISPLAY_NAME}.zip" \
+            "https://wow.curseforge.com/api/projects/$PROJECT_ID/upload-file")
+          RESPONSE=$(cat /tmp/cf_response.json)
+          echo "Response (HTTP $HTTP_CODE): $RESPONSE"
+          if echo "$RESPONSE" | jq -e '.id' > /dev/null 2>&1; then
+            echo "Upload successful (file ID: $(echo "$RESPONSE" | jq '.id'))"
+          else
+            echo "Upload failed: $(echo "$RESPONSE" | jq -r '.errorMessage // "unknown error"')"
+            exit 1
+          fi
 
   test:
     needs: [changes, deploy]
