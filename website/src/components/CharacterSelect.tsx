@@ -85,12 +85,23 @@ async function fetchCharacters (region: Region, accessToken: string): Promise<Fe
   return characters.sort((a, b) => b.level - a.level)
 }
 
+const REGION_KEY = 'key-coord-region'
+
 export default function CharacterSelect (): JSX.Element {
   const { user, selectCharacter, logout } = useAuth()
-  const [region, setRegion] = useState<Region | ''>('')
+  const [region, setRegion] = useState<Region | ''>(() => {
+    const stored = localStorage.getItem(REGION_KEY)
+    return stored !== null && (regions as readonly string[]).includes(stored) ? stored as Region : ''
+  })
   const [characters, setCharacters] = useState<FetchedCharacter[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const handleRegionChange = (v: string): void => {
+    const r = v as Region | ''
+    setRegion(r)
+    if (r !== '') localStorage.setItem(REGION_KEY, r)
+  }
 
   useEffect(() => {
     if (region === '' || user === null) return
@@ -149,7 +160,7 @@ export default function CharacterSelect (): JSX.Element {
         <div className="mb-6">
           <Combobox
             value={region}
-            onChange={v => { setRegion(v as Region | '') }}
+            onChange={handleRegionChange}
             options={regions as unknown as string[]}
             placeholder="Select region"
             className="w-40"

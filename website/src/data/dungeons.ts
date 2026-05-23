@@ -5,7 +5,7 @@ export const dungeonNames: Record<number, string> = {
   559: 'Nexus-Point Xenas',
   557: 'Windrunner Spire',
   402: "Algeth'ar Academy",
-  583: 'Seat of the Triumvirate',
+  239: 'Seat of the Triumvirate',
   161: 'Skyreach',
   556: 'Pit of Saron',
 }

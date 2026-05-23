@@ -16,7 +16,8 @@ local C = {
 local popup
 local cachedLevel = nil
 local cachedMapID = nil
-local watchingBags = false
+local loginTime = 0
+local LOGIN_SETTLE = 5
 local frame = CreateFrame("Frame")
 
 local function solidTex(parent, r, g, b, a, sublevel)
@@ -200,76 +201,48 @@ local function ShowKeystonePopup()
   popup:Show()
 end
 
-local function UpdateKeystoneCache()
-  cachedLevel = C_MythicPlus.GetOwnedKeystoneLevel()
-  cachedMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
-end
-
-local function StartBagWatch()
-  if not watchingBags then
-    frame:RegisterEvent("BAG_UPDATE_DELAYED")
-    watchingBags = true
-  end
-end
-
-local function StopBagWatch()
-  if watchingBags then
-    frame:UnregisterEvent("BAG_UPDATE_DELAYED")
-    watchingBags = false
-  end
-end
-
-local function RefreshBagWatch()
-  -- Only watch bags when there's no key yet; characters that can't hold
-  -- keystones will always have cachedLevel == nil but the handler is a
-  -- no-op for them since GetOwnedKeystoneLevel() will never return non-nil
-  if cachedLevel == nil then
-    StartBagWatch()
-  else
-    StopBagWatch()
+local function CheckAndUpdateKeystone()
+  local newLevel = C_MythicPlus.GetOwnedKeystoneLevel()
+  local newMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+  if newLevel == nil then return end
+  local changed = newLevel ~= cachedLevel or newMapID ~= cachedMapID
+  cachedLevel = newLevel
+  cachedMapID = newMapID
+  if changed and GetTime() - loginTime > LOGIN_SETTLE then
+    ShowKeystonePopup()
   end
 end
 
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
 frame:RegisterEvent("MYTHIC_PLUS_CURRENT_AFFIX_UPDATE")
+frame:RegisterEvent("BAG_UPDATE_DELAYED")
 
 frame:SetScript("OnEvent", function(self, event)
   if event == "PLAYER_LOGIN" then
+    loginTime = GetTime()
     if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
     C_Timer.After(1, function()
-      UpdateKeystoneCache()
-      RefreshBagWatch()
+      CheckAndUpdateKeystone()  -- settle period blocks any popup
       print("|cffff9900KeyCoord:|r Type /keycoord or /kc to submit your Mythic+ key.")
     end)
 
   elseif event == "CHALLENGE_MODE_COMPLETED" then
-    local newLevel = C_MythicPlus.GetOwnedKeystoneLevel()
-    local newMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
-    if newLevel ~= nil and (newLevel ~= cachedLevel or newMapID ~= cachedMapID) then
-      cachedLevel = newLevel
-      cachedMapID = newMapID
-      ShowKeystonePopup()
-    else
-      StartBagWatch()
-    end
-
-  elseif event == "MYTHIC_PLUS_CURRENT_AFFIX_UPDATE" then
     if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
     C_Timer.After(1, function()
-      UpdateKeystoneCache()
-      RefreshBagWatch()
+      CheckAndUpdateKeystone()
+    end)
+
+  elseif event == "MYTHIC_PLUS_CURRENT_AFFIX_UPDATE" then
+    C_Timer.After(1, function()
+      CheckAndUpdateKeystone()
     end)
 
   elseif event == "BAG_UPDATE_DELAYED" then
-    local newLevel = C_MythicPlus.GetOwnedKeystoneLevel()
-    local newMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
-    if newLevel ~= nil and (newLevel ~= cachedLevel or newMapID ~= cachedMapID) then
-      cachedLevel = newLevel
-      cachedMapID = newMapID
-      StopBagWatch()
-      ShowKeystonePopup()
-    end
+    if C_MythicPlus.RequestOwnedKeystoneInfo then C_MythicPlus.RequestOwnedKeystoneInfo() end
+    C_Timer.After(1, function()
+      CheckAndUpdateKeystone()
+    end)
   end
 end)
 
@@ -281,6 +254,5 @@ SLASH_KCTEST1 = "/kctest"
 SlashCmdList["KCTEST"] = function()
   cachedLevel = nil
   cachedMapID = nil
-  StartBagWatch()
-  print("|cffff9900KeyCoord:|r Bag watch started — move any item in a bag to trigger.")
+  print("|cffff9900KeyCoord:|r Cache cleared — next bag update will trigger popup if a key is found.")
 end

@@ -44,7 +44,7 @@ function SortIcon ({ field, sortField, sortDir }: { field: SortField, sortField:
 }
 
 export default function App (): JSX.Element {
-  const { user, login, logout, selectedCharacter, clearCharacter, pendingKey, clearPendingKey } = useAuth()
+  const { user, login, logout, expireSession, sessionExpired, selectedCharacter, clearCharacter, pendingKey, clearPendingKey } = useAuth()
   const [keys, setKeys] = useState<Key[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -156,7 +156,14 @@ export default function App (): JSX.Element {
         `https://${region}.api.blizzard.com/profile/user/wow?namespace=profile-${region}&locale=en_US`,
         { headers: { Authorization: `Bearer ${user.accessToken}` } },
       )
-      if (!profileRes.ok) throw new Error('Could not verify character ownership')
+      if (!profileRes.ok) {
+        if (profileRes.status === 401) {
+          hasSubmittedRef.current = false
+          expireSession()
+          return
+        }
+        throw new Error('Could not verify character ownership')
+      }
       const profile = await profileRes.json() as { wow_accounts: Array<{ characters: Array<{ name: string, realm: { slug: string } }> }> }
       const chars = profile.wow_accounts.flatMap(a => a.characters)
       const owned = chars.some(
@@ -198,7 +205,7 @@ export default function App (): JSX.Element {
     } finally {
       setSubmitLoading(false)
     }
-  }, [pendingKey, user, fetchKeys, clearPendingKey])
+  }, [pendingKey, user, fetchKeys, clearPendingKey, expireSession])
 
   useEffect(() => {
     if (pendingKey === null || user === null || hasSubmittedRef.current) return
@@ -305,8 +312,32 @@ export default function App (): JSX.Element {
       <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-8 space-y-5">
         {user === null && (
           <div className="rounded-xl border border-slate-800 bg-slate-900 py-20 text-center">
-            <p className="mb-1 text-xl font-semibold text-white">Sign in to get started</p>
-            <p className="mb-6 text-base text-slate-400">Log in with Battle.net to see your guild&apos;s Mythic+ keys.</p>
+            {sessionExpired
+              ? (
+                <>
+                  <p className="mb-1 text-xl font-semibold text-white">Your session has expired</p>
+                  <p className="mb-6 text-base text-slate-400">
+                    {pendingKey !== null
+                      ? <>Log in again to submit your <span className="text-white font-medium">+{pendingKey.keyLevel}</span> key for <span className="text-white font-medium">{pendingKey.characterName}</span>.</>
+                      : 'Your Battle.net session has expired. Please log in again.'}
+                  </p>
+                </>
+                )
+              : pendingKey !== null
+                ? (
+                  <>
+                    <p className="mb-1 text-xl font-semibold text-white">Log in to submit your key</p>
+                    <p className="mb-6 text-base text-slate-400">
+                      Sign in with Battle.net to submit your <span className="text-white font-medium">+{pendingKey.keyLevel}</span> key for <span className="text-white font-medium">{pendingKey.characterName}</span>.
+                    </p>
+                  </>
+                  )
+                : (
+                  <>
+                    <p className="mb-1 text-xl font-semibold text-white">Sign in to get started</p>
+                    <p className="mb-6 text-base text-slate-400">Log in with Battle.net to see your guild&apos;s Mythic+ keys.</p>
+                  </>
+                  )}
             <button
               onClick={login}
               className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500"
