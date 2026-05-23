@@ -91,9 +91,22 @@ jobs:
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
           PROJECT_ID: ${{ secrets.CURSEFORGE_PROJECT_ID }}
+          VERSION: ${{ steps.toc.outputs.version }}
+          GAME_VERSION_ID: ${{ steps.cfver.outputs.id }}
         run: |
-          curl -s --fail-with-body -X POST \
+          METADATA=$(printf '{"gameVersions":[%s],"displayName":"%s","releaseType":"release","changelog":"","changelogType":"text"}' \
+            "$GAME_VERSION_ID" "$VERSION")
+          echo "Uploading KeyCoord-${VERSION}.zip with metadata: $METADATA"
+          HTTP_CODE=$(curl -s -o /tmp/cf_response.json -w "%{http_code}" -X POST \
             -H "X-Api-Token: $CURSEFORGE_TOKEN" \
-            -F "metadata={\"gameVersions\":[${{ steps.cfver.outputs.id }}],\"displayName\":\"${{ steps.toc.outputs.version }}\",\"releaseType\":\"release\",\"changelog\":\"\",\"changelogType\":\"text\"}" \
-            -F "file=@KeyCoord-${{ steps.toc.outputs.version }}.zip" \
-            "https://wow.curseforge.com/api/projects/$PROJECT_ID/upload-file"
+            -F "metadata=$METADATA" \
+            -F "file=@KeyCoord-${VERSION}.zip" \
+            "https://wow.curseforge.com/api/projects/$PROJECT_ID/upload-file")
+          RESPONSE=$(cat /tmp/cf_response.json)
+          echo "Response (HTTP $HTTP_CODE): $RESPONSE"
+          if echo "$RESPONSE" | jq -e '.id' > /dev/null 2>&1; then
+            echo "Upload successful (file ID: $(echo "$RESPONSE" | jq '.id'))"
+          else
+            echo "Upload failed: $(echo "$RESPONSE" | jq -r '.errorMessage // "unknown error"')"
+            exit 1
+          fi
