@@ -249,10 +249,3 @@ end)
 SLASH_KEYCOORD1 = "/keycoord"
 SLASH_KEYCOORD2 = "/kc"
 SlashCmdList["KEYCOORD"] = ShowKeystonePopup
-
-SLASH_KCTEST1 = "/kctest"
-SlashCmdList["KCTEST"] = function()
-  cachedLevel = nil
-  cachedMapID = nil
-  print("|cffff9900KeyCoord:|r Cache cleared — next bag update will trigger popup if a key is found.")
-end
